@@ -97,6 +97,11 @@ function App() {
   const prevMeshSettingsRef = useRef<MeshSettings>(DEFAULT_MESH_SETTINGS);
   const prevRenderStyleRef = useRef<RenderStyle>(RenderStyle.WIREFRAME);
 
+  const meshSettingsRef = useRef<MeshSettings>(DEFAULT_MESH_SETTINGS);
+  const audioSettingsRef = useRef<AudioSettings>(DEFAULT_AUDIO_SETTINGS);
+  const globalSettingsRef = useRef<GlobalSettings>(DEFAULT_GLOBAL_SETTINGS);
+  const particleSettingsRef = useRef<ParticleSettings>(defaultParticleSettings);
+
   const [meshSettings, setMeshSettings] = useState<MeshSettings>(DEFAULT_MESH_SETTINGS);
   const [audioSettings, setAudioSettings] = useState<AudioSettings>(DEFAULT_AUDIO_SETTINGS);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>(DEFAULT_GLOBAL_SETTINGS);
@@ -204,31 +209,36 @@ function App() {
 
     const animate = () => {
       const time = performance.now();
-      updateSmoothedParameters(globalSettings.parameterSmoothing);
+      const currentGlobalSettings = globalSettingsRef.current;
+      const currentMeshSettings = meshSettingsRef.current;
+      const currentAudioSettings = audioSettingsRef.current;
+      const currentParticleSettings = particleSettingsRef.current;
+
+      updateSmoothedParameters(currentGlobalSettings.parameterSmoothing);
 
       const effectiveMesh: MeshSettings = {
-        ...meshSettings,
-        displacement: getSmoothedValue('displacement', meshSettings.displacement),
-        noiseScale:   getSmoothedValue('noiseScale',   meshSettings.noiseScale),
-        noiseSpeed:   getSmoothedValue('noiseSpeed',   meshSettings.noiseSpeed),
-        subWeight:    getSmoothedValue('subWeight',    meshSettings.subWeight),
-        bassWeight:   getSmoothedValue('bassWeight',   meshSettings.bassWeight),
-        midsWeight:   getSmoothedValue('midsWeight',   meshSettings.midsWeight),
-        highsWeight:  getSmoothedValue('highsWeight',  meshSettings.highsWeight),
-        pointSize:    getSmoothedValue('pointSize',    meshSettings.pointSize),
-        pointDensity: getSmoothedValue('pointDensity', meshSettings.pointDensity)
+        ...currentMeshSettings,
+        displacement: getSmoothedValue('displacement', currentMeshSettings.displacement),
+        noiseScale:   getSmoothedValue('noiseScale',   currentMeshSettings.noiseScale),
+        noiseSpeed:   getSmoothedValue('noiseSpeed',   currentMeshSettings.noiseSpeed),
+        subWeight:    getSmoothedValue('subWeight',    currentMeshSettings.subWeight),
+        bassWeight:   getSmoothedValue('bassWeight',   currentMeshSettings.bassWeight),
+        midsWeight:   getSmoothedValue('midsWeight',   currentMeshSettings.midsWeight),
+        highsWeight:  getSmoothedValue('highsWeight',  currentMeshSettings.highsWeight),
+        pointSize:    getSmoothedValue('pointSize',    currentMeshSettings.pointSize),
+        pointDensity: getSmoothedValue('pointDensity', currentMeshSettings.pointDensity)
       };
 
       const effectiveAudio: AudioSettings = {
-        ...audioSettings,
-        smoothing:      getSmoothedValue('audioSmoothing',   audioSettings.smoothing),
-        sensitivity:    getSmoothedValue('audioSensitivity', audioSettings.sensitivity),
-        peakThreshold:  getSmoothedValue('peakThreshold',    audioSettings.peakThreshold),
-        peakCooldown:   getSmoothedValue('peakCooldown',     audioSettings.peakCooldown)
+        ...currentAudioSettings,
+        smoothing:      getSmoothedValue('audioSmoothing',   currentAudioSettings.smoothing),
+        sensitivity:    getSmoothedValue('audioSensitivity', currentAudioSettings.sensitivity),
+        peakThreshold:  getSmoothedValue('peakThreshold',    currentAudioSettings.peakThreshold),
+        peakCooldown:   getSmoothedValue('peakCooldown',     currentAudioSettings.peakCooldown)
       };
 
-      if (sceneManagerRef.current && globalSettings.autoOrbit) {
-        sceneManagerRef.current.updateAutoOrbit(true, getSmoothedValue('orbitSpeed', globalSettings.orbitSpeed));
+      if (sceneManagerRef.current && currentGlobalSettings.autoOrbit) {
+        sceneManagerRef.current.updateAutoOrbit(true, getSmoothedValue('orbitSpeed', currentGlobalSettings.orbitSpeed));
       }
 
       if (audioEngineRef.current) {
@@ -243,8 +253,8 @@ function App() {
 
         setAudioFeatures(features);
 
-        if (meshSettings.renderStyle === RenderStyle.PARTICLES) {
-          particleSystemRef.current?.update(time, features, particleSettings);
+        if (currentMeshSettings.renderStyle === RenderStyle.PARTICLES) {
+          particleSystemRef.current?.update(time, features, currentParticleSettings);
         } else {
           reactiveMeshRef.current?.update(time, features, effectiveMesh);
         }
@@ -325,6 +335,10 @@ function App() {
   }, []);
 
   useEffect(() => { midiStateRef.current = midiState; }, [midiState]);
+  useEffect(() => { meshSettingsRef.current = meshSettings; }, [meshSettings]);
+  useEffect(() => { audioSettingsRef.current = audioSettings; }, [audioSettings]);
+  useEffect(() => { globalSettingsRef.current = globalSettings; }, [globalSettings]);
+  useEffect(() => { particleSettingsRef.current = particleSettings; }, [particleSettings]);
 
   useEffect(() => {
     setTargetValue('displacement', meshSettings.displacement);
