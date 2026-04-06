@@ -5,7 +5,10 @@ import {
   RenderStyle,
   DetailLevel,
   MeshSettings,
-  GlobalSettings
+  GlobalSettings,
+  ParticleSettings,
+  ParticleQuality,
+  defaultParticleSettings
 } from '../types/scene';
 import { AudioSettings, AudioFeatures } from '../types/audio';
 import { Preset } from '../types/preset';
@@ -17,11 +20,13 @@ interface ControlPanelProps {
   meshSettings: MeshSettings;
   audioSettings: AudioSettings;
   globalSettings: GlobalSettings;
+  particleSettings: ParticleSettings;
   audioFeatures: AudioFeatures;
   midiState: MIDIState;
   onMeshSettingsChange: (settings: MeshSettings) => void;
   onAudioSettingsChange: (settings: AudioSettings) => void;
   onGlobalSettingsChange: (settings: GlobalSettings) => void;
+  onParticleSettingsChange: (settings: ParticleSettings) => void;
   onHelpClick: () => void;
   onReset: () => void;
   onLoadPreset: (preset: Preset) => void;
@@ -38,11 +43,13 @@ export function ControlPanel({
   meshSettings,
   audioSettings,
   globalSettings,
+  particleSettings,
   audioFeatures,
   midiState,
   onMeshSettingsChange,
   onAudioSettingsChange,
   onGlobalSettingsChange,
+  onParticleSettingsChange,
   onHelpClick,
   onReset,
   onLoadPreset,
@@ -56,6 +63,8 @@ export function ControlPanel({
 }: ControlPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAudioDebug, setShowAudioDebug] = useState(true);
+
+  const isParticleMode = meshSettings.renderStyle === RenderStyle.PARTICLES;
 
   const getStepSize = (smoothing: number): number => {
     return 0.1 - (smoothing - 0.05) * 0.2;
@@ -75,6 +84,11 @@ export function ControlPanel({
     }
   };
 
+  const isLearning = (id: string) =>
+    midiState.settings.learnMode && midiState.learningParameterId === id
+      ? 'ring-2 ring-green-500'
+      : '';
+
   return (
     <div className={`fixed top-16 right-0 bottom-0 bg-black/80 backdrop-blur-md border-l border-white/10 transition-transform duration-300 ${isExpanded ? 'translate-x-0' : 'translate-x-full'} w-96 overflow-y-auto`}>
       <button
@@ -87,26 +101,20 @@ export function ControlPanel({
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">Controls</h2>
-          <button
-            onClick={onHelpClick}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-          >
+          <button onClick={onHelpClick} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
             <HelpCircle size={20} />
           </button>
         </div>
 
+        {/* Presets */}
         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
           <PresetPanel
             onLoadPreset={onLoadPreset}
-            getCurrentPresetData={() => ({
-              name: '',
-              meshSettings,
-              audioSettings,
-              globalSettings
-            })}
+            getCurrentPresetData={() => ({ name: '', meshSettings, audioSettings, globalSettings })}
           />
         </div>
 
+        {/* MIDI */}
         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
           <MIDIPanel
             isSupported={midiState.isSupported}
@@ -125,118 +133,57 @@ export function ControlPanel({
           />
         </div>
 
+        {/* Audio Analysis */}
         {showAudioDebug && (
           <div className="space-y-3 bg-white/5 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Audio Analysis</h3>
-              <button
-                onClick={() => setShowAudioDebug(false)}
-                className="text-xs text-white/50 hover:text-white/80"
-              >
+              <button onClick={() => setShowAudioDebug(false)} className="text-xs text-white/50 hover:text-white/80">
                 Hide
               </button>
             </div>
-
             <div className="space-y-2 text-xs">
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-white/70">Energy</span>
-                  <span className="font-mono">{audioFeatures.energy.toFixed(2)}</span>
+              {[
+                { label: 'Energy', value: audioFeatures.energy, color: 'from-blue-500 to-cyan-500' },
+                { label: 'Sub',    value: audioFeatures.sub,    color: 'bg-red-500' },
+                { label: 'Bass',   value: audioFeatures.bass,   color: 'bg-orange-500' },
+                { label: 'Mids',   value: audioFeatures.mids,   color: 'bg-yellow-500' },
+                { label: 'Highs',  value: audioFeatures.highs,  color: 'bg-cyan-500' },
+              ].map(({ label, value, color }) => (
+                <div key={label}>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-white/70">{label}</span>
+                    <span className="font-mono">{value.toFixed(2)}</span>
+                  </div>
+                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div className={`h-full ${color.startsWith('from') ? `bg-gradient-to-r ${color}` : color}`} style={{ width: `${value * 100}%` }} />
+                  </div>
                 </div>
-                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-cyan-500"
-                    style={{ width: `${audioFeatures.energy * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-white/70">Sub</span>
-                  <span className="font-mono">{audioFeatures.sub.toFixed(2)}</span>
-                </div>
-                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-red-500"
-                    style={{ width: `${audioFeatures.sub * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-white/70">Bass</span>
-                  <span className="font-mono">{audioFeatures.bass.toFixed(2)}</span>
-                </div>
-                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-orange-500"
-                    style={{ width: `${audioFeatures.bass * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-white/70">Mids</span>
-                  <span className="font-mono">{audioFeatures.mids.toFixed(2)}</span>
-                </div>
-                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-yellow-500"
-                    style={{ width: `${audioFeatures.mids * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-white/70">Highs</span>
-                  <span className="font-mono">{audioFeatures.highs.toFixed(2)}</span>
-                </div>
-                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-cyan-500"
-                    style={{ width: `${audioFeatures.highs * 100}%` }}
-                  />
-                </div>
-              </div>
-
+              ))}
               <div className="flex items-center justify-between pt-2 border-t border-white/10">
                 <span className="text-white/70">Peak Trigger</span>
-                <div
-                  className={`w-3 h-3 rounded-full ${audioFeatures.peakTrigger ? 'bg-green-500' : 'bg-white/20'}`}
-                />
+                <div className={`w-3 h-3 rounded-full ${audioFeatures.peakTrigger ? 'bg-green-500' : 'bg-white/20'}`} />
               </div>
             </div>
           </div>
         )}
-
         {!showAudioDebug && (
-          <button
-            onClick={() => setShowAudioDebug(true)}
-            className="text-sm text-white/50 hover:text-white/80"
-          >
+          <button onClick={() => setShowAudioDebug(true)} className="text-sm text-white/50 hover:text-white/80">
             Show Audio Analysis
           </button>
         )}
 
+        {/* ── Reactive Mesh ── */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold border-b border-white/10 pb-2">
-            Reactive Mesh
-          </h3>
+          <h3 className="text-lg font-semibold border-b border-white/10 pb-2">Reactive Mesh</h3>
 
+          {/* Geometry — hidden in particle mode */}
+          {!isParticleMode && (
             <div>
               <label className="block text-sm font-medium mb-2">Geometry</label>
               <select
                 value={meshSettings.geometryType}
-                onChange={(e) =>
-                  onMeshSettingsChange({
-                    ...meshSettings,
-                    geometryType: e.target.value as GeometryType
-                  })
-                }
+                onChange={(e) => onMeshSettingsChange({ ...meshSettings, geometryType: e.target.value as GeometryType })}
                 className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-blue-500"
               >
                 <option value={GeometryType.PLANE}>Plane</option>
@@ -247,17 +194,15 @@ export function ControlPanel({
                 <option value={GeometryType.CYLINDER}>Cylinder</option>
               </select>
             </div>
+          )}
 
+          {/* Detail Level — hidden in particle mode */}
+          {!isParticleMode && (
             <div>
               <label className="block text-sm font-medium mb-2">Detail Level</label>
               <select
                 value={meshSettings.detailLevel}
-                onChange={(e) =>
-                  onMeshSettingsChange({
-                    ...meshSettings,
-                    detailLevel: e.target.value as DetailLevel
-                  })
-                }
+                onChange={(e) => onMeshSettingsChange({ ...meshSettings, detailLevel: e.target.value as DetailLevel })}
                 className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-blue-500"
               >
                 <option value={DetailLevel.LOW}>Low</option>
@@ -265,506 +210,334 @@ export function ControlPanel({
                 <option value={DetailLevel.HIGH}>High</option>
               </select>
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Render Style</label>
-              <select
-                value={meshSettings.renderStyle}
-                onChange={(e) =>
-                  onMeshSettingsChange({
-                    ...meshSettings,
-                    renderStyle: e.target.value as RenderStyle
-                  })
-                }
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-blue-500"
-              >
-                <option value={RenderStyle.WIREFRAME}>Wireframe</option>
-                <option value={RenderStyle.POINTS}>Points</option>
-              </select>
-            </div>
+          {/* Render Style */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Render Style</label>
+            <select
+              value={meshSettings.renderStyle}
+              onChange={(e) => onMeshSettingsChange({ ...meshSettings, renderStyle: e.target.value as RenderStyle })}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-blue-500"
+            >
+              <option value={RenderStyle.WIREFRAME}>Wireframe</option>
+              <option value={RenderStyle.POINTS}>Points</option>
+              <option value={RenderStyle.PARTICLES}>Particles</option>
+            </select>
+          </div>
 
+          {/* Base Color — hidden in particle mode (particles have their own colors) */}
+          {!isParticleMode && (
             <div>
               <label className="block text-sm font-medium mb-2">Base Color</label>
               <input
                 type="color"
                 value={meshSettings.baseColor}
-                onChange={(e) =>
-                  onMeshSettingsChange({
-                    ...meshSettings,
-                    baseColor: e.target.value
-                  })
-                }
+                onChange={(e) => onMeshSettingsChange({ ...meshSettings, baseColor: e.target.value })}
                 className="w-full h-10 bg-white/5 border border-white/10 rounded-lg cursor-pointer"
-              />
-            </div>
-
-            {meshSettings.renderStyle === RenderStyle.POINTS && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Point Size: {meshSettings.pointSize.toFixed(2)}
-                  </label>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="3"
-                    step={stepSize}
-                    value={meshSettings.pointSize}
-                    onChange={(e) =>
-                      onMeshSettingsChange({
-                        ...meshSettings,
-                        pointSize: parseFloat(e.target.value)
-                      })
-                    }
-                    onClick={() => handleSliderClick('pointSize', 'Point Size', 0.1, 3)}
-                    className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'pointSize' ? 'ring-2 ring-green-500' : ''}`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Point Density: {(meshSettings.pointDensity * 100).toFixed(0)}%
-                  </label>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="1"
-                    step={stepSize}
-                    value={meshSettings.pointDensity}
-                    onChange={(e) =>
-                      onMeshSettingsChange({
-                        ...meshSettings,
-                        pointDensity: parseFloat(e.target.value)
-                      })
-                    }
-                    onClick={() => handleSliderClick('pointDensity', 'Point Density', 0.1, 1)}
-                    className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'pointDensity' ? 'ring-2 ring-green-500' : ''}`}
-                  />
-                </div>
-              </>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Displacement: {meshSettings.displacement.toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="2"
-                step={stepSize}
-                value={meshSettings.displacement}
-                onChange={(e) =>
-                  onMeshSettingsChange({
-                    ...meshSettings,
-                    displacement: parseFloat(e.target.value)
-                  })
-                }
-                onClick={() => handleSliderClick('displacement', 'Displacement', 0, 2)}
-                className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'displacement' ? 'ring-2 ring-green-500' : ''}`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Noise Scale: {meshSettings.noiseScale.toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min="0.5"
-                max="5"
-                step={stepSize}
-                value={meshSettings.noiseScale}
-                onChange={(e) =>
-                  onMeshSettingsChange({
-                    ...meshSettings,
-                    noiseScale: parseFloat(e.target.value)
-                  })
-                }
-                onClick={() => handleSliderClick('noiseScale', 'Noise Scale', 0.5, 5)}
-                className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'noiseScale' ? 'ring-2 ring-green-500' : ''}`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Noise Speed: {meshSettings.noiseSpeed.toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min="0.1"
-                max="2"
-                step={stepSize}
-                value={meshSettings.noiseSpeed}
-                onChange={(e) =>
-                  onMeshSettingsChange({
-                    ...meshSettings,
-                    noiseSpeed: parseFloat(e.target.value)
-                  })
-                }
-                onClick={() => handleSliderClick('noiseSpeed', 'Noise Speed', 0.1, 2)}
-                className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'noiseSpeed' ? 'ring-2 ring-green-500' : ''}`}
-              />
-            </div>
-
-            <div className="space-y-3 pt-2 border-t border-white/10">
-              <h4 className="text-sm font-semibold">Band Mapping</h4>
-
-              <div>
-                <label className="block text-xs text-white/70 mb-1">
-                  Sub: {meshSettings.subWeight.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={meshSettings.subWeight}
-                  onChange={(e) =>
-                    onMeshSettingsChange({
-                      ...meshSettings,
-                      subWeight: parseFloat(e.target.value)
-                    })
-                  }
-                  onClick={() => handleSliderClick('subWeight', 'Sub Band', 0, 1)}
-                  className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'subWeight' ? 'ring-2 ring-green-500' : ''}`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-white/70 mb-1">
-                  Bass: {meshSettings.bassWeight.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={meshSettings.bassWeight}
-                  onChange={(e) =>
-                    onMeshSettingsChange({
-                      ...meshSettings,
-                      bassWeight: parseFloat(e.target.value)
-                    })
-                  }
-                  onClick={() => handleSliderClick('bassWeight', 'Bass Band', 0, 1)}
-                  className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'bassWeight' ? 'ring-2 ring-green-500' : ''}`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-white/70 mb-1">
-                  Mids: {meshSettings.midsWeight.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={meshSettings.midsWeight}
-                  onChange={(e) =>
-                    onMeshSettingsChange({
-                      ...meshSettings,
-                      midsWeight: parseFloat(e.target.value)
-                    })
-                  }
-                  onClick={() => handleSliderClick('midsWeight', 'Mids Band', 0, 1)}
-                  className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'midsWeight' ? 'ring-2 ring-green-500' : ''}`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-white/70 mb-1">
-                  Highs: {meshSettings.highsWeight.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={meshSettings.highsWeight}
-                  onChange={(e) =>
-                    onMeshSettingsChange({
-                      ...meshSettings,
-                      highsWeight: parseFloat(e.target.value)
-                    })
-                  }
-                  onClick={() => handleSliderClick('highsWeight', 'Highs Band', 0, 1)}
-                  className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'highsWeight' ? 'ring-2 ring-green-500' : ''}`}
-                />
-              </div>
-            </div>
-
-          <div
-            className={`flex items-center gap-2 p-2 rounded ${midiState.settings.learnMode && midiState.learningParameterId === 'pulseOnPeak' ? 'ring-2 ring-green-500' : ''}`}
-            onClick={() => handleToggleClick('pulseOnPeak', 'Pulse on Peak')}
-          >
-            <input
-              type="checkbox"
-              id="pulseOnPeak"
-              checked={meshSettings.pulseOnPeak}
-              onChange={(e) =>
-                onMeshSettingsChange({
-                  ...meshSettings,
-                  pulseOnPeak: e.target.checked
-                })
-              }
-              className="w-4 h-4"
-            />
-            <label htmlFor="pulseOnPeak" className="text-sm cursor-pointer">
-              Pulse on Peak
-            </label>
-          </div>
-        </div>
-
-        <div className="space-y-4 pt-4 border-t border-white/10">
-          <h3 className="text-lg font-semibold">Audio Analysis</h3>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Smoothing: {audioSettings.smoothing.toFixed(2)}
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="0.95"
-              step="0.05"
-              value={audioSettings.smoothing}
-              onChange={(e) =>
-                onAudioSettingsChange({
-                  ...audioSettings,
-                  smoothing: parseFloat(e.target.value)
-                })
-              }
-              onClick={() => handleSliderClick('audioSmoothing', 'Audio Smoothing', 0, 0.95)}
-              className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'audioSmoothing' ? 'ring-2 ring-green-500' : ''}`}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Sensitivity: {audioSettings.sensitivity.toFixed(1)}
-            </label>
-            <input
-              type="range"
-              min="0.5"
-              max="3"
-              step="0.1"
-              value={audioSettings.sensitivity}
-              onChange={(e) =>
-                onAudioSettingsChange({
-                  ...audioSettings,
-                  sensitivity: parseFloat(e.target.value)
-                })
-              }
-              onClick={() => handleSliderClick('audioSensitivity', 'Audio Sensitivity', 0.5, 3)}
-              className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'audioSensitivity' ? 'ring-2 ring-green-500' : ''}`}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Peak Threshold: {audioSettings.peakThreshold.toFixed(2)}
-            </label>
-            <input
-              type="range"
-              min="0.1"
-              max="0.8"
-              step="0.05"
-              value={audioSettings.peakThreshold}
-              onChange={(e) =>
-                onAudioSettingsChange({
-                  ...audioSettings,
-                  peakThreshold: parseFloat(e.target.value)
-                })
-              }
-              onClick={() => handleSliderClick('peakThreshold', 'Peak Threshold', 0.1, 0.8)}
-              className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'peakThreshold' ? 'ring-2 ring-green-500' : ''}`}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Peak Cooldown: {audioSettings.peakCooldown}ms
-            </label>
-            <input
-              type="range"
-              min="50"
-              max="500"
-              step="50"
-              value={audioSettings.peakCooldown}
-              onChange={(e) =>
-                onAudioSettingsChange({
-                  ...audioSettings,
-                  peakCooldown: parseFloat(e.target.value)
-                })
-              }
-              onClick={() => handleSliderClick('peakCooldown', 'Peak Cooldown', 50, 500)}
-              className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'peakCooldown' ? 'ring-2 ring-green-500' : ''}`}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4 pt-4 border-t border-white/10">
-          <h3 className="text-lg font-semibold">Global Settings</h3>
-
-          <div
-            className={`flex items-center gap-2 p-2 rounded ${midiState.settings.learnMode && midiState.learningParameterId === 'autoOrbit' ? 'ring-2 ring-green-500' : ''}`}
-            onClick={() => handleToggleClick('autoOrbit', 'Auto Orbit')}
-          >
-            <input
-              type="checkbox"
-              id="autoOrbit"
-              checked={globalSettings.autoOrbit}
-              onChange={(e) =>
-                onGlobalSettingsChange({
-                  ...globalSettings,
-                  autoOrbit: e.target.checked
-                })
-              }
-              className="w-4 h-4"
-            />
-            <label htmlFor="autoOrbit" className="text-sm cursor-pointer">
-              Auto Orbit
-            </label>
-          </div>
-
-          {globalSettings.autoOrbit && (
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Orbit Speed: {globalSettings.orbitSpeed.toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min="0.1"
-                max="2"
-                step={stepSize}
-                value={globalSettings.orbitSpeed}
-                onChange={(e) =>
-                  onGlobalSettingsChange({
-                    ...globalSettings,
-                    orbitSpeed: parseFloat(e.target.value)
-                  })
-                }
-                onClick={() => handleSliderClick('orbitSpeed', 'Orbit Speed', 0.1, 2)}
-                className={`w-full ${midiState.settings.learnMode && midiState.learningParameterId === 'orbitSpeed' ? 'ring-2 ring-green-500' : ''}`}
               />
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Parameter Smoothing: {globalSettings.parameterSmoothing.toFixed(2)}
-            </label>
-            <input
-              type="range"
-              min="0.05"
-              max="0.5"
-              step="0.05"
-              value={globalSettings.parameterSmoothing}
-              onChange={(e) =>
-                onGlobalSettingsChange({
-                  ...globalSettings,
-                  parameterSmoothing: parseFloat(e.target.value)
-                })
-              }
-              className="w-full"
-            />
-            <p className="text-xs text-white/50 mt-1">
-              Controls smoothness of all parameter changes
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="bloom"
-              checked={globalSettings.bloom}
-              onChange={(e) =>
-                onGlobalSettingsChange({
-                  ...globalSettings,
-                  bloom: e.target.checked
-                })
-              }
-              className="w-4 h-4"
-            />
-            <label htmlFor="bloom" className="text-sm text-white">
-              Bloom Effect
-            </label>
-          </div>
-
-          {globalSettings.bloom && (
+          {/* Points controls */}
+          {meshSettings.renderStyle === RenderStyle.POINTS && (
             <>
               <div>
-                <label className="text-xs text-white/70 flex justify-between">
-                  <span>Bloom Strength</span>
-                  <span>{globalSettings.bloomStrength.toFixed(2)}</span>
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="3"
-                  step="0.1"
-                  value={globalSettings.bloomStrength}
-                  onChange={(e) =>
-                    onGlobalSettingsChange({
-                      ...globalSettings,
-                      bloomStrength: parseFloat(e.target.value)
-                    })
-                  }
-                  className="w-full"
-                />
+                <label className="block text-sm font-medium mb-2">Point Size: {meshSettings.pointSize.toFixed(2)}</label>
+                <input type="range" min="0.1" max="3" step={stepSize} value={meshSettings.pointSize}
+                  onChange={(e) => onMeshSettingsChange({ ...meshSettings, pointSize: parseFloat(e.target.value) })}
+                  onClick={() => handleSliderClick('pointSize', 'Point Size', 0.1, 3)}
+                  className={`w-full ${isLearning('pointSize')}`} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Point Density: {(meshSettings.pointDensity * 100).toFixed(0)}%</label>
+                <input type="range" min="0.1" max="1" step={stepSize} value={meshSettings.pointDensity}
+                  onChange={(e) => onMeshSettingsChange({ ...meshSettings, pointDensity: parseFloat(e.target.value) })}
+                  onClick={() => handleSliderClick('pointDensity', 'Point Density', 0.1, 1)}
+                  className={`w-full ${isLearning('pointDensity')}`} />
+              </div>
+            </>
+          )}
+
+          {/* Mesh displacement/noise — hidden in particle mode */}
+          {!isParticleMode && (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-2">Displacement: {meshSettings.displacement.toFixed(2)}</label>
+                <input type="range" min="0" max="2" step={stepSize} value={meshSettings.displacement}
+                  onChange={(e) => onMeshSettingsChange({ ...meshSettings, displacement: parseFloat(e.target.value) })}
+                  onClick={() => handleSliderClick('displacement', 'Displacement', 0, 2)}
+                  className={`w-full ${isLearning('displacement')}`} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Noise Scale: {meshSettings.noiseScale.toFixed(2)}</label>
+                <input type="range" min="0.5" max="5" step={stepSize} value={meshSettings.noiseScale}
+                  onChange={(e) => onMeshSettingsChange({ ...meshSettings, noiseScale: parseFloat(e.target.value) })}
+                  onClick={() => handleSliderClick('noiseScale', 'Noise Scale', 0.5, 5)}
+                  className={`w-full ${isLearning('noiseScale')}`} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Noise Speed: {meshSettings.noiseSpeed.toFixed(2)}</label>
+                <input type="range" min="0.1" max="2" step={stepSize} value={meshSettings.noiseSpeed}
+                  onChange={(e) => onMeshSettingsChange({ ...meshSettings, noiseSpeed: parseFloat(e.target.value) })}
+                  onClick={() => handleSliderClick('noiseSpeed', 'Noise Speed', 0.1, 2)}
+                  className={`w-full ${isLearning('noiseSpeed')}`} />
               </div>
 
-              <div>
-                <label className="text-xs text-white/70 flex justify-between">
-                  <span>Bloom Radius</span>
-                  <span>{globalSettings.bloomRadius.toFixed(2)}</span>
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={globalSettings.bloomRadius}
-                  onChange={(e) =>
-                    onGlobalSettingsChange({
-                      ...globalSettings,
-                      bloomRadius: parseFloat(e.target.value)
-                    })
-                  }
-                  className="w-full"
-                />
+              {/* Band Mapping */}
+              <div className="space-y-3 pt-2 border-t border-white/10">
+                <h4 className="text-sm font-semibold">Band Mapping</h4>
+                {[
+                  { key: 'subWeight',  label: 'Sub',  value: meshSettings.subWeight },
+                  { key: 'bassWeight', label: 'Bass', value: meshSettings.bassWeight },
+                  { key: 'midsWeight', label: 'Mids', value: meshSettings.midsWeight },
+                  { key: 'highsWeight',label: 'Highs',value: meshSettings.highsWeight },
+                ].map(({ key, label, value }) => (
+                  <div key={key}>
+                    <label className="block text-xs text-white/70 mb-1">{label}: {value.toFixed(2)}</label>
+                    <input type="range" min="0" max="1" step="0.1" value={value}
+                      onChange={(e) => onMeshSettingsChange({ ...meshSettings, [key]: parseFloat(e.target.value) })}
+                      onClick={() => handleSliderClick(key, `${label} Band`, 0, 1)}
+                      className={`w-full ${isLearning(key)}`} />
+                  </div>
+                ))}
               </div>
 
-              <div>
-                <label className="text-xs text-white/70 flex justify-between">
-                  <span>Bloom Threshold</span>
-                  <span>{globalSettings.bloomThreshold.toFixed(2)}</span>
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={globalSettings.bloomThreshold}
-                  onChange={(e) =>
-                    onGlobalSettingsChange({
-                      ...globalSettings,
-                      bloomThreshold: parseFloat(e.target.value)
-                    })
-                  }
-                  className="w-full"
-                />
+              <div
+                className={`flex items-center gap-2 p-2 rounded ${isLearning('pulseOnPeak')}`}
+                onClick={() => handleToggleClick('pulseOnPeak', 'Pulse on Peak')}
+              >
+                <input type="checkbox" id="pulseOnPeak" checked={meshSettings.pulseOnPeak}
+                  onChange={(e) => onMeshSettingsChange({ ...meshSettings, pulseOnPeak: e.target.checked })}
+                  className="w-4 h-4" />
+                <label htmlFor="pulseOnPeak" className="text-sm cursor-pointer">Pulse on Peak</label>
               </div>
             </>
           )}
         </div>
 
-        <button
-          onClick={onReset}
-          className="w-full px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-        >
+        {/* ── Particle System Controls ── */}
+        {isParticleMode && (
+          <div className="space-y-4 pt-4 border-t border-white/10">
+            <h3 className="text-lg font-semibold">Particle System</h3>
+
+            {/* Quality */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Quality</label>
+              <select
+                value={particleSettings.quality}
+                onChange={(e) => onParticleSettingsChange({ ...particleSettings, quality: e.target.value as ParticleQuality })}
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-blue-500"
+              >
+                <option value={ParticleQuality.LOW}>Low (18k particles)</option>
+                <option value={ParticleQuality.MEDIUM}>Medium (42k particles)</option>
+                <option value={ParticleQuality.HIGH}>High (80k particles)</option>
+              </select>
+            </div>
+
+            {/* Field Size */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Field Size: {particleSettings.fieldSize.toFixed(0)}</label>
+              <input type="range" min="5" max="50" step="1" value={particleSettings.fieldSize}
+                onChange={(e) => onParticleSettingsChange({ ...particleSettings, fieldSize: parseFloat(e.target.value) })}
+                className="w-full" />
+            </div>
+
+            {/* Core Layer */}
+            <div className="space-y-3 pt-2 border-t border-white/10">
+              <h4 className="text-sm font-semibold text-white/80">✦ Core Layer</h4>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Core Color</label>
+                <input type="color" value={particleSettings.coreColor}
+                  onChange={(e) => onParticleSettingsChange({ ...particleSettings, coreColor: e.target.value })}
+                  className="w-full h-10 bg-white/5 border border-white/10 rounded-lg cursor-pointer" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Core Size: {particleSettings.coreSize.toFixed(1)}</label>
+                <input type="range" min="0.5" max="8" step="0.1" value={particleSettings.coreSize}
+                  onChange={(e) => onParticleSettingsChange({ ...particleSettings, coreSize: parseFloat(e.target.value) })}
+                  className="w-full" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Core Brightness: {particleSettings.coreBrightness.toFixed(1)}</label>
+                <input type="range" min="0.5" max="4" step="0.1" value={particleSettings.coreBrightness}
+                  onChange={(e) => onParticleSettingsChange({ ...particleSettings, coreBrightness: parseFloat(e.target.value) })}
+                  className="w-full" />
+              </div>
+            </div>
+
+            {/* Outer Layer */}
+            <div className="space-y-3 pt-2 border-t border-white/10">
+              <h4 className="text-sm font-semibold text-white/80">◎ Outer Layer</h4>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Outer Color</label>
+                <input type="color" value={particleSettings.outerColor}
+                  onChange={(e) => onParticleSettingsChange({ ...particleSettings, outerColor: e.target.value })}
+                  className="w-full h-10 bg-white/5 border border-white/10 rounded-lg cursor-pointer" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Outer Size: {particleSettings.outerSize.toFixed(1)}</label>
+                <input type="range" min="2" max="20" step="0.5" value={particleSettings.outerSize}
+                  onChange={(e) => onParticleSettingsChange({ ...particleSettings, outerSize: parseFloat(e.target.value) })}
+                  className="w-full" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Outer Opacity: {particleSettings.outerOpacity.toFixed(2)}</label>
+                <input type="range" min="0.01" max="0.8" step="0.01" value={particleSettings.outerOpacity}
+                  onChange={(e) => onParticleSettingsChange({ ...particleSettings, outerOpacity: parseFloat(e.target.value) })}
+                  className="w-full" />
+              </div>
+            </div>
+
+            {/* Motion */}
+            <div className="space-y-3 pt-2 border-t border-white/10">
+              <h4 className="text-sm font-semibold text-white/80">↯ Motion</h4>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Turbulence: {particleSettings.turbulence.toFixed(1)}</label>
+                <input type="range" min="0" max="5" step="0.1" value={particleSettings.turbulence}
+                  onChange={(e) => onParticleSettingsChange({ ...particleSettings, turbulence: parseFloat(e.target.value) })}
+                  className="w-full" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Noise Speed: {particleSettings.noiseSpeed.toFixed(2)}</label>
+                <input type="range" min="0.01" max="1" step="0.01" value={particleSettings.noiseSpeed}
+                  onChange={(e) => onParticleSettingsChange({ ...particleSettings, noiseSpeed: parseFloat(e.target.value) })}
+                  className="w-full" />
+              </div>
+            </div>
+
+            {/* Audio Reactivity */}
+            <div className="space-y-3 pt-2 border-t border-white/10">
+              <h4 className="text-sm font-semibold text-white/80">♫ Audio Reactivity</h4>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Bass Reactivity: {particleSettings.bassReactivity.toFixed(1)}</label>
+                <input type="range" min="0" max="3" step="0.1" value={particleSettings.bassReactivity}
+                  onChange={(e) => onParticleSettingsChange({ ...particleSettings, bassReactivity: parseFloat(e.target.value) })}
+                  className="w-full" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Highs Reactivity: {particleSettings.highsReactivity.toFixed(1)}</label>
+                <input type="range" min="0" max="3" step="0.1" value={particleSettings.highsReactivity}
+                  onChange={(e) => onParticleSettingsChange({ ...particleSettings, highsReactivity: parseFloat(e.target.value) })}
+                  className="w-full" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Energy Reactivity: {particleSettings.energyReactivity.toFixed(1)}</label>
+                <input type="range" min="0" max="3" step="0.1" value={particleSettings.energyReactivity}
+                  onChange={(e) => onParticleSettingsChange({ ...particleSettings, energyReactivity: parseFloat(e.target.value) })}
+                  className="w-full" />
+              </div>
+
+              <div className="flex items-center gap-2 p-2 rounded">
+                <input type="checkbox" id="particlePeakBurst" checked={particleSettings.peakBurst}
+                  onChange={(e) => onParticleSettingsChange({ ...particleSettings, peakBurst: e.target.checked })}
+                  className="w-4 h-4" />
+                <label htmlFor="particlePeakBurst" className="text-sm cursor-pointer">Peak Burst</label>
+              </div>
+            </div>
+
+            {/* Reset particles */}
+            <button
+              onClick={() => onParticleSettingsChange(defaultParticleSettings)}
+              className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm transition-colors"
+            >
+              Reset Particle Defaults
+            </button>
+          </div>
+        )}
+
+        {/* Audio Analysis Settings */}
+        <div className="space-y-4 pt-4 border-t border-white/10">
+          <h3 className="text-lg font-semibold">Audio Analysis</h3>
+
+          {[
+            { key: 'smoothing',      label: 'Smoothing',      min: 0,    max: 0.95, step: 0.05, id: 'audioSmoothing' },
+            { key: 'sensitivity',    label: 'Sensitivity',    min: 0.5,  max: 3,    step: 0.1,  id: 'audioSensitivity' },
+            { key: 'peakThreshold',  label: 'Peak Threshold', min: 0.1,  max: 0.8,  step: 0.05, id: 'peakThreshold' },
+            { key: 'peakCooldown',   label: 'Peak Cooldown',  min: 50,   max: 500,  step: 50,   id: 'peakCooldown', suffix: 'ms' },
+          ].map(({ key, label, min, max, step, id, suffix }) => (
+            <div key={key}>
+              <label className="block text-sm font-medium mb-2">
+                {label}: {(audioSettings as any)[key].toFixed(key === 'peakCooldown' ? 0 : 2)}{suffix ?? ''}
+              </label>
+              <input type="range" min={min} max={max} step={step} value={(audioSettings as any)[key]}
+                onChange={(e) => onAudioSettingsChange({ ...audioSettings, [key]: parseFloat(e.target.value) })}
+                onClick={() => handleSliderClick(id, label, min, max)}
+                className={`w-full ${isLearning(id)}`} />
+            </div>
+          ))}
+        </div>
+
+        {/* Global Settings */}
+        <div className="space-y-4 pt-4 border-t border-white/10">
+          <h3 className="text-lg font-semibold">Global Settings</h3>
+
+          <div className={`flex items-center gap-2 p-2 rounded ${isLearning('autoOrbit')}`}
+            onClick={() => handleToggleClick('autoOrbit', 'Auto Orbit')}>
+            <input type="checkbox" id="autoOrbit" checked={globalSettings.autoOrbit}
+              onChange={(e) => onGlobalSettingsChange({ ...globalSettings, autoOrbit: e.target.checked })}
+              className="w-4 h-4" />
+            <label htmlFor="autoOrbit" className="text-sm cursor-pointer">Auto Orbit</label>
+          </div>
+
+          {globalSettings.autoOrbit && (
+            <div>
+              <label className="block text-sm font-medium mb-2">Orbit Speed: {globalSettings.orbitSpeed.toFixed(2)}</label>
+              <input type="range" min="0.1" max="2" step={stepSize} value={globalSettings.orbitSpeed}
+                onChange={(e) => onGlobalSettingsChange({ ...globalSettings, orbitSpeed: parseFloat(e.target.value) })}
+                onClick={() => handleSliderClick('orbitSpeed', 'Orbit Speed', 0.1, 2)}
+                className={`w-full ${isLearning('orbitSpeed')}`} />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Parameter Smoothing: {globalSettings.parameterSmoothing.toFixed(2)}</label>
+            <input type="range" min="0.05" max="0.5" step="0.05" value={globalSettings.parameterSmoothing}
+              onChange={(e) => onGlobalSettingsChange({ ...globalSettings, parameterSmoothing: parseFloat(e.target.value) })}
+              className="w-full" />
+            <p className="text-xs text-white/50 mt-1">Controls smoothness of all parameter changes</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="bloom" checked={globalSettings.bloom}
+              onChange={(e) => onGlobalSettingsChange({ ...globalSettings, bloom: e.target.checked })}
+              className="w-4 h-4" />
+            <label htmlFor="bloom" className="text-sm text-white">Bloom Effect</label>
+          </div>
+
+          {globalSettings.bloom && (
+            <>
+              {[
+                { key: 'bloomStrength',  label: 'Bloom Strength',  min: 0, max: 3,   step: 0.1  },
+                { key: 'bloomRadius',    label: 'Bloom Radius',    min: 0, max: 1,   step: 0.05 },
+                { key: 'bloomThreshold', label: 'Bloom Threshold', min: 0, max: 1,   step: 0.05 },
+              ].map(({ key, label, min, max, step }) => (
+                <div key={key}>
+                  <label className="text-xs text-white/70 flex justify-between">
+                    <span>{label}</span>
+                    <span>{(globalSettings as any)[key].toFixed(2)}</span>
+                  </label>
+                  <input type="range" min={min} max={max} step={step} value={(globalSettings as any)[key]}
+                    onChange={(e) => onGlobalSettingsChange({ ...globalSettings, [key]: parseFloat(e.target.value) })}
+                    className="w-full" />
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+
+        <button onClick={onReset} className="w-full px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
           Reset to Defaults
         </button>
       </div>
