@@ -67,7 +67,7 @@ void main() {
   // Color: shift from coreColor toward white at high energy
   float whiteness = uEnergy * uEnergyReactivity * 0.6 + uHighs * 0.3 + uPeakBurst * 0.5;
   vColor      = mix(uCoreColor, vec3(1.0), clamp(whiteness, 0.0, 0.85));
-  vBrightness = uCoreBrightness + uEnergy * uEnergyReactivity * 2.0 + uPeakBurst * 3.0;
+  vBrightness = uCoreBrightness * 0.4 + uEnergy * uEnergyReactivity * 0.8 + uPeakBurst * 1.2;
   vAlpha      = 1.0;
 }
 `;
@@ -85,7 +85,7 @@ void main() {
   // Soft bright core with sharp falloff at edge
   float core  = 1.0 - smoothstep(0.0, 0.35, dist);   // tight bright center
   float glow  = 1.0 - smoothstep(0.0, 1.0,  dist);   // wider soft halo
-  float alpha = (core * 0.9 + glow * 0.35) * vAlpha;
+  float alpha = (core * 0.35 + glow * 0.12) * vAlpha;
   alpha = clamp(alpha, 0.0, 1.0);
 
   vec3 color = vColor * vBrightness;
