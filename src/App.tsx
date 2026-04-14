@@ -341,6 +341,13 @@ function App() {
   useEffect(() => { particleSettingsRef.current = particleSettings; }, [particleSettings]);
 
   useEffect(() => {
+    if (mode === 'mediaReactor') {
+      midiControllerRef.current?.dispose();
+      midiControllerRef.current = null;
+    }
+  }, [mode]);
+
+  useEffect(() => {
     setTargetValue('displacement', meshSettings.displacement);
     setTargetValue('noiseScale',   meshSettings.noiseScale);
     setTargetValue('noiseSpeed',   meshSettings.noiseSpeed);
