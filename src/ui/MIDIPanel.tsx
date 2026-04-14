@@ -1,14 +1,8 @@
 import { Music2, Trash2, Circle, AlertCircle } from 'lucide-react';
-import { MIDIDeviceInfo, MIDIMapping, MIDISettings } from '../types/midi';
+import { MIDIState } from '../types/midi';
 
 interface MIDIPanelProps {
-  isSupported: boolean;
-  hasAccess: boolean;
-  isInitializing: boolean;
-  devices: MIDIDeviceInfo[];
-  settings: MIDISettings;
-  learningParameterId: string | null;
-  lastActivity: number;
+  midiState: MIDIState;
   onEnableChange: (enabled: boolean) => void;
   onDeviceChange: (deviceId: string | null) => void;
   onSmoothingChange: (smoothing: number) => void;
@@ -18,13 +12,7 @@ interface MIDIPanelProps {
 }
 
 export function MIDIPanel({
-  isSupported,
-  hasAccess,
-  isInitializing,
-  devices,
-  settings,
-  learningParameterId,
-  lastActivity,
+  midiState,
   onEnableChange,
   onDeviceChange,
   onSmoothingChange,
@@ -32,6 +20,7 @@ export function MIDIPanel({
   onRemoveMapping,
   onClearMappings
 }: MIDIPanelProps) {
+  const { isSupported, hasAccess, isInitializing, devices, settings, learningParameterId, lastActivity } = midiState;
   const isActive = Date.now() - lastActivity < 100;
 
   if (!isSupported) {
