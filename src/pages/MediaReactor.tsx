@@ -242,7 +242,23 @@ export function MediaReactor({ onBack }: MediaReactorProps) {
   }, [midiState.settings]);
 
   useEffect(() => {
-    setMidiState((p) => ({ ...p, isSupported: MIDIController.isSupported() }));
+    const initMIDI = async () => {
+      const controller = new MIDIController();
+      const isSupported = controller.isSupported();
+      setMidiState((p) => ({ ...p, isSupported }));
+      if (!isSupported || !midiState.settings.enabled) return;
+      const hasAccess = await controller.initialize();
+      if (hasAccess) {
+        const devices = controller.getDevices();
+        controller.setSelectedDevice(midiState.settings.selectedDeviceId);
+        controller.setSmoothing(midiState.settings.smoothing);
+        controller.setMessageCallback(handleMIDIMessage);
+        setMidiState((p) => ({ ...p, hasAccess: true, devices }));
+        midiControllerRef.current = controller;
+      }
+    };
+    initMIDI();
+    return () => { midiControllerRef.current?.dispose(); };
   }, []);
 
   useEffect(() => {
