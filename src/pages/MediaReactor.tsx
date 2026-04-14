@@ -8,6 +8,16 @@ import { Canvas2DRenderer } from '../visuals/Canvas2DRenderer';
 import { MediaReactorControls } from '../ui/MediaReactorControls';
 import { MediaReactorSettings, MediaType, MediaFile, RenderMode, MediaGeometry, FitMode, EffectsQuality } from '../types/mediaReactor';
 import { AudioSettings, AudioFeatures } from '../types/audio';
+import { MIDIController, applyMIDIValueToParameter } from '../midi/MIDIController';
+import { MIDIState } from '../types/midi';
+import {
+  loadMediaReactorMIDISettings,
+  saveMediaReactorMIDISettings,
+  addMediaReactorMIDIMapping,
+  removeMediaReactorMIDIMapping,
+  clearAllMediaReactorMIDIMappings,
+  findMediaReactorMappingByCC
+} from '../utils/mediaReactorMidiStorage';
 import { formatTime } from '../utils/formatTime';
 
 const DEFAULT_SETTINGS: MediaReactorSettings = {
@@ -55,16 +65,29 @@ export function MediaReactor({ onBack }: MediaReactorProps) {
   const audioEngineRef = useRef<AudioEngine | null>(null);
   const audioAnalyserRef = useRef<AudioAnalyser | null>(null);
   const recordingManagerRef = useRef<RecordingManager | null>(null);
+  const midiControllerRef = useRef<MIDIController | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const mediaFileRef = useRef<MediaFile | null>(null);
   const settingsRef = useRef<MediaReactorSettings>(DEFAULT_SETTINGS);
   const audioSettingsRef = useRef<AudioSettings>(DEFAULT_AUDIO_SETTINGS);
+  const midiStateRef = useRef<MIDIState | null>(null);
   const use2DCanvasRef = useRef<boolean>(false);
   const preRecordingQualityRef = useRef<EffectsQuality | null>(null);
 
   const [settings, setSettings] = useState<MediaReactorSettings>(DEFAULT_SETTINGS);
   const [audioSettings, setAudioSettings] = useState<AudioSettings>(DEFAULT_AUDIO_SETTINGS);
   const [audioFeatures, setAudioFeatures] = useState<AudioFeatures>(DEFAULT_AUDIO_FEATURES);
+
+  const [midiState, setMidiState] = useState<MIDIState>({
+    isSupported: false,
+    hasAccess: false,
+    isInitializing: false,
+    devices: [],
+    settings: loadMediaReactorMIDISettings(),
+    lastActivity: 0,
+    learningParameterId: null,
+    learningContext: null
+  });
 
   const [mediaFileName, setMediaFileName] = useState<string | null>(null);
   const [audioFileName, setAudioFileName] = useState<string | null>(null);
@@ -209,6 +232,55 @@ export function MediaReactor({ onBack }: MediaReactorProps) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    midiStateRef.current = midiState;
+  }, [midiState]);
+
+  useEffect(() => {
+    saveMediaReactorMIDISettings(midiState.settings);
+  }, [midiState.settings]);
+
+  useEffect(() => {
+    setMidiState((p) => ({ ...p, isSupported: MIDIController.isSupported() }));
+  }, []);
+
+  useEffect(() => {
+    const enableDisableMIDI = async () => {
+      if (midiState.settings.enabled && !midiState.hasAccess && midiState.isSupported) {
+        setMidiState((p) => ({ ...p, isInitializing: true }));
+        const controller = midiControllerRef.current || new MIDIController();
+        const hasAccess = await controller.initialize();
+        if (hasAccess) {
+          const devices = controller.getDevices();
+          controller.setSelectedDevice(midiState.settings.selectedDeviceId);
+          controller.setSmoothing(midiState.settings.smoothing);
+          controller.setMessageCallback(handleMIDIMessage);
+          setMidiState((p) => ({ ...p, hasAccess: true, isInitializing: false, devices }));
+          midiControllerRef.current = controller;
+        } else {
+          setMidiState((p) => ({ ...p, hasAccess: false, isInitializing: false }));
+        }
+      } else if (!midiState.settings.enabled && midiState.hasAccess) {
+        midiControllerRef.current?.dispose();
+        setMidiState((p) => ({ ...p, hasAccess: false, isInitializing: false, devices: [] }));
+        midiControllerRef.current = null;
+      }
+    };
+    enableDisableMIDI();
+  }, [midiState.settings.enabled]);
+
+  useEffect(() => {
+    if (midiControllerRef.current && midiState.hasAccess) {
+      midiControllerRef.current.setSelectedDevice(midiState.settings.selectedDeviceId);
+    }
+  }, [midiState.settings.selectedDeviceId]);
+
+  useEffect(() => {
+    if (midiControllerRef.current && midiState.hasAccess) {
+      midiControllerRef.current.setSmoothing(midiState.settings.smoothing);
+    }
+  }, [midiState.settings.smoothing]);
 
   useEffect(() => {
     settingsRef.current = settings;
@@ -363,6 +435,89 @@ export function MediaReactor({ onBack }: MediaReactorProps) {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [audioFileName, isPlaying]);
+
+  const handleMIDIMessage = (ccNumber: number, value: number) => {
+    setMidiState((p) => ({ ...p, lastActivity: Date.now() }));
+    const currentState = midiStateRef.current;
+    if (!currentState) return;
+
+    const mapping = findMediaReactorMappingByCC(currentState.settings, ccNumber);
+    if (!mapping) {
+      if (currentState.settings.learnMode && currentState.learningContext) {
+        const newSettings = addMediaReactorMIDIMapping(currentState.settings, {
+          parameterId: currentState.learningContext.parameterId,
+          parameterName: currentState.learningContext.parameterName,
+          ccNumber,
+          min: currentState.learningContext.min,
+          max: currentState.learningContext.max,
+          isToggle: currentState.learningContext.isToggle
+        });
+        setMidiState((p) => ({ ...p, settings: newSettings, learningParameterId: null, learningContext: null }));
+      }
+      return;
+    }
+
+    applyParameterValue(mapping.parameterId, applyMIDIValueToParameter(value, mapping));
+  };
+
+  const applyParameterValue = (parameterId: string, value: number | boolean) => {
+    switch (parameterId) {
+      case 'brightness':
+        setSettings((p) => ({ ...p, brightness: value as number }));
+        break;
+      case 'contrast':
+        setSettings((p) => ({ ...p, contrast: value as number }));
+        break;
+      case 'rgbSplit':
+        setSettings((p) => ({ ...p, rgbSplit: value as number }));
+        break;
+      case 'glitch':
+        setSettings((p) => ({ ...p, glitch: value as number }));
+        break;
+      case 'zoomPulse':
+        setSettings((p) => ({ ...p, zoomPulse: value as number }));
+        break;
+      case 'displacement':
+        setSettings((p) => ({ ...p, displacement: value as number }));
+        break;
+      case 'geometryDisplacement':
+        setSettings((p) => ({ ...p, geometryDisplacement: value as number }));
+        break;
+      case 'intensity':
+        setSettings((p) => ({ ...p, intensity: value as number }));
+        break;
+      case 'audioSensitivity':
+        setAudioSettings((p) => ({ ...p, sensitivity: value as number }));
+        break;
+      case 'audioSmoothing':
+        setAudioSettings((p) => ({ ...p, smoothing: value as number }));
+        break;
+      case 'peakThreshold':
+        setAudioSettings((p) => ({ ...p, peakThreshold: value as number }));
+        break;
+      case 'peakCooldown':
+        setAudioSettings((p) => ({ ...p, peakCooldown: value as number }));
+        break;
+      case 'orbitSpeed':
+        setSettings((p) => ({ ...p, orbitSpeed: value as number }));
+        break;
+      case 'autoOrbit':
+        setSettings((p) => ({ ...p, autoOrbit: value as boolean }));
+        break;
+    }
+  };
+
+  const handleParameterClick = (parameterId: string, parameterName: string, min: number, max: number, isToggle?: boolean) => {
+    if (!midiState.settings.learnMode) return;
+    setMidiState((p) => ({ ...p, learningParameterId: parameterId, learningContext: { parameterId, parameterName, min, max, isToggle } }));
+  };
+
+  const handleMIDIEnableChange = (enabled: boolean) => setMidiState((p) => ({ ...p, settings: { ...p.settings, enabled } }));
+  const handleMIDIDeviceChange = (deviceId: string | null) => setMidiState((p) => ({ ...p, settings: { ...p.settings, selectedDeviceId: deviceId } }));
+  const handleMIDISmoothingChange = (smoothing: number) => setMidiState((p) => ({ ...p, settings: { ...p.settings, smoothing } }));
+  const handleMIDILearnModeChange = (enabled: boolean) => setMidiState((p) => ({ ...p, settings: { ...p.settings, learnMode: enabled }, learningParameterId: null, learningContext: null }));
+  const handleMIDIRemoveMapping = (parameterId: string) => setMidiState((p) => ({ ...p, settings: removeMediaReactorMIDIMapping(p.settings, parameterId) }));
+  const handleMIDIClearMappings = () => setMidiState((p) => ({ ...p, settings: clearAllMediaReactorMIDIMappings(p.settings) }));
 
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -665,8 +820,16 @@ export function MediaReactor({ onBack }: MediaReactorProps) {
         settings={settings}
         audioSettings={audioSettings}
         audioFeatures={audioFeatures}
+        midiState={midiState}
         onSettingsChange={setSettings}
         onAudioSettingsChange={setAudioSettings}
+        onParameterClick={handleParameterClick}
+        onMIDIEnableChange={handleMIDIEnableChange}
+        onMIDIDeviceChange={handleMIDIDeviceChange}
+        onMIDISmoothingChange={handleMIDISmoothingChange}
+        onMIDILearnModeChange={handleMIDILearnModeChange}
+        onMIDIRemoveMapping={handleMIDIRemoveMapping}
+        onMIDIClearMappings={handleMIDIClearMappings}
       />
 
       <div className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg p-4">

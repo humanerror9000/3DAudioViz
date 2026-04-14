@@ -1,20 +1,39 @@
 import { MediaReactorSettings, RenderMode, MediaGeometry, FitMode, EffectsQuality } from '../types/mediaReactor';
 import { AudioSettings, AudioFeatures } from '../types/audio';
+import { MIDIState } from '../types/midi';
+import { MIDIPanel } from './MIDIPanel';
+import { findMediaReactorMappingByParameter } from '../utils/mediaReactorMidiStorage';
 
 interface MediaReactorControlsProps {
   settings: MediaReactorSettings;
   audioSettings: AudioSettings;
   audioFeatures: AudioFeatures;
+  midiState: MIDIState;
   onSettingsChange: (settings: MediaReactorSettings) => void;
   onAudioSettingsChange: (settings: AudioSettings) => void;
+  onParameterClick: (parameterId: string, parameterName: string, min: number, max: number, isToggle?: boolean) => void;
+  onMIDIEnableChange: (enabled: boolean) => void;
+  onMIDIDeviceChange: (deviceId: string | null) => void;
+  onMIDISmoothingChange: (smoothing: number) => void;
+  onMIDILearnModeChange: (enabled: boolean) => void;
+  onMIDIRemoveMapping: (parameterId: string) => void;
+  onMIDIClearMappings: () => void;
 }
 
 export function MediaReactorControls({
   settings,
   audioSettings,
   audioFeatures,
+  midiState,
   onSettingsChange,
-  onAudioSettingsChange
+  onAudioSettingsChange,
+  onParameterClick,
+  onMIDIEnableChange,
+  onMIDIDeviceChange,
+  onMIDISmoothingChange,
+  onMIDILearnModeChange,
+  onMIDIRemoveMapping,
+  onMIDIClearMappings
 }: MediaReactorControlsProps) {
   const updateSetting = <K extends keyof MediaReactorSettings>(
     key: K,
@@ -23,12 +42,34 @@ export function MediaReactorControls({
     onSettingsChange({ ...settings, [key]: value });
   };
 
+  const handleSliderClick = (parameterId: string, parameterName: string, min: number, max: number) => {
+    onParameterClick(parameterId, parameterName, min, max, false);
+  };
+
+  const isLearning = (parameterId: string): boolean => {
+    return midiState.learningParameterId === parameterId;
+  };
+
+  const hasMapping = (parameterId: string): boolean => {
+    return !!findMediaReactorMappingByParameter(midiState.settings, parameterId);
+  };
+
   return (
     <div className="absolute right-4 top-20 bottom-20 w-80 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg overflow-y-auto">
       <div className="p-4 space-y-6">
         <div>
           <h3 className="text-lg font-semibold mb-4 text-white">Media Reactor Controls</h3>
         </div>
+
+        <MIDIPanel
+          midiState={midiState}
+          onEnableChange={onMIDIEnableChange}
+          onDeviceChange={onMIDIDeviceChange}
+          onSmoothingChange={onMIDISmoothingChange}
+          onLearnModeChange={onMIDILearnModeChange}
+          onRemoveMapping={onMIDIRemoveMapping}
+          onClearMappings={onMIDIClearMappings}
+        />
 
         <div className="space-y-4">
           <div>
@@ -127,7 +168,8 @@ export function MediaReactorControls({
                       step="0.1"
                       value={settings.orbitSpeed}
                       onChange={(e) => updateSetting('orbitSpeed', parseFloat(e.target.value))}
-                      className="w-full"
+                      onClick={() => handleSliderClick('orbitSpeed', 'Orbit Speed', 0.1, 5)}
+                      className={`w-full ${isLearning('orbitSpeed') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('orbitSpeed') ? 'ring-1 ring-blue-500' : ''}`}
                     />
                   </div>
                 )}
@@ -170,7 +212,8 @@ export function MediaReactorControls({
                   step="0.01"
                   value={settings.intensity}
                   onChange={(e) => updateSetting('intensity', parseFloat(e.target.value))}
-                  className="w-full"
+                  onClick={() => handleSliderClick('intensity', 'Intensity', 0, 2)}
+                  className={`w-full ${isLearning('intensity') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('intensity') ? 'ring-1 ring-blue-500' : ''}`}
                 />
               </div>
 
@@ -186,7 +229,8 @@ export function MediaReactorControls({
                   step="0.01"
                   value={settings.brightness}
                   onChange={(e) => updateSetting('brightness', parseFloat(e.target.value))}
-                  className="w-full"
+                  onClick={() => handleSliderClick('brightness', 'Brightness', 0, 1)}
+                  className={`w-full ${isLearning('brightness') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('brightness') ? 'ring-1 ring-blue-500' : ''}`}
                 />
               </div>
 
@@ -202,7 +246,8 @@ export function MediaReactorControls({
                   step="0.01"
                   value={settings.contrast}
                   onChange={(e) => updateSetting('contrast', parseFloat(e.target.value))}
-                  className="w-full"
+                  onClick={() => handleSliderClick('contrast', 'Contrast', 0, 1)}
+                  className={`w-full ${isLearning('contrast') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('contrast') ? 'ring-1 ring-blue-500' : ''}`}
                 />
               </div>
 
@@ -218,7 +263,8 @@ export function MediaReactorControls({
                   step="0.01"
                   value={settings.rgbSplit}
                   onChange={(e) => updateSetting('rgbSplit', parseFloat(e.target.value))}
-                  className="w-full"
+                  onClick={() => handleSliderClick('rgbSplit', 'RGB Split', 0, 1)}
+                  className={`w-full ${isLearning('rgbSplit') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('rgbSplit') ? 'ring-1 ring-blue-500' : ''}`}
                 />
               </div>
 
@@ -234,7 +280,8 @@ export function MediaReactorControls({
                   step="0.01"
                   value={settings.glitch}
                   onChange={(e) => updateSetting('glitch', parseFloat(e.target.value))}
-                  className="w-full"
+                  onClick={() => handleSliderClick('glitch', 'Glitch', 0, 1)}
+                  className={`w-full ${isLearning('glitch') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('glitch') ? 'ring-1 ring-blue-500' : ''}`}
                 />
               </div>
 
@@ -250,7 +297,8 @@ export function MediaReactorControls({
                   step="0.01"
                   value={settings.zoomPulse}
                   onChange={(e) => updateSetting('zoomPulse', parseFloat(e.target.value))}
-                  className="w-full"
+                  onClick={() => handleSliderClick('zoomPulse', 'Zoom/Pulse', 0, 1)}
+                  className={`w-full ${isLearning('zoomPulse') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('zoomPulse') ? 'ring-1 ring-blue-500' : ''}`}
                 />
               </div>
 
@@ -266,7 +314,8 @@ export function MediaReactorControls({
                   step="0.01"
                   value={settings.displacement}
                   onChange={(e) => updateSetting('displacement', parseFloat(e.target.value))}
-                  className="w-full"
+                  onClick={() => handleSliderClick('displacement', 'Displacement', 0, 1)}
+                  className={`w-full ${isLearning('displacement') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('displacement') ? 'ring-1 ring-blue-500' : ''}`}
                 />
               </div>
 
@@ -283,7 +332,8 @@ export function MediaReactorControls({
                     step="0.01"
                     value={settings.geometryDisplacement}
                     onChange={(e) => updateSetting('geometryDisplacement', parseFloat(e.target.value))}
-                    className="w-full"
+                    onClick={() => handleSliderClick('geometryDisplacement', 'Geometry Displacement', 0, 1)}
+                    className={`w-full ${isLearning('geometryDisplacement') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('geometryDisplacement') ? 'ring-1 ring-blue-500' : ''}`}
                   />
                   <p className="text-xs text-white/50 mt-1">
                     Audio-reactive vertex deformation
@@ -367,7 +417,8 @@ export function MediaReactorControls({
                       smoothing: parseFloat(e.target.value)
                     })
                   }
-                  className="w-full"
+                  onClick={() => handleSliderClick('audioSmoothing', 'Audio Smoothing', 0, 0.95)}
+                  className={`w-full ${isLearning('audioSmoothing') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('audioSmoothing') ? 'ring-1 ring-blue-500' : ''}`}
                 />
               </div>
 
@@ -388,7 +439,8 @@ export function MediaReactorControls({
                       sensitivity: parseFloat(e.target.value)
                     })
                   }
-                  className="w-full"
+                  onClick={() => handleSliderClick('audioSensitivity', 'Audio Sensitivity', 0.5, 3)}
+                  className={`w-full ${isLearning('audioSensitivity') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('audioSensitivity') ? 'ring-1 ring-blue-500' : ''}`}
                 />
               </div>
 
@@ -409,7 +461,8 @@ export function MediaReactorControls({
                       peakThreshold: parseFloat(e.target.value)
                     })
                   }
-                  className="w-full"
+                  onClick={() => handleSliderClick('peakThreshold', 'Peak Threshold', 0.1, 0.8)}
+                  className={`w-full ${isLearning('peakThreshold') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('peakThreshold') ? 'ring-1 ring-blue-500' : ''}`}
                 />
               </div>
 
@@ -430,7 +483,8 @@ export function MediaReactorControls({
                       peakCooldown: parseFloat(e.target.value)
                     })
                   }
-                  className="w-full"
+                  onClick={() => handleSliderClick('peakCooldown', 'Peak Cooldown', 50, 500)}
+                  className={`w-full ${isLearning('peakCooldown') ? 'ring-2 ring-yellow-500' : ''} ${hasMapping('peakCooldown') ? 'ring-1 ring-blue-500' : ''}`}
                 />
               </div>
             </div>
