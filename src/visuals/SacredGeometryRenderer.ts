@@ -261,17 +261,26 @@ export class SacredGeometryRenderer {
     layerMesh.group.position.set(...layer.position);
     layerMesh.group.scale.setScalar(layer.scale);
     layerMesh.baseRotation.set(...layer.rotation);
+    layerMesh.group.rotation.copy(layerMesh.baseRotation);
 
     layerMesh.group.traverse((child) => {
-      if (child instanceof THREE.Line || child instanceof THREE.Mesh) {
-        const material = child.material as THREE.Material & { color?: THREE.Color; opacity?: number };
-        if (material.color) {
-          material.color.set(layer.color);
-        }
-        if (material.opacity !== undefined) {
-          material.opacity = layer.opacity;
-          material.transparent = layer.opacity < 1;
-        }
+      if (child instanceof THREE.Line) {
+        const material = child.material as THREE.LineBasicMaterial;
+        material.color.set(layer.color);
+        material.opacity = layer.opacity;
+        material.transparent = layer.opacity < 1;
+        material.linewidth = layer.strokeWidth;
+      } else if (child instanceof THREE.Mesh) {
+        const material = child.material as THREE.MeshStandardMaterial;
+        material.color.set(layer.color);
+        material.opacity = layer.opacity;
+        material.transparent = layer.opacity < 1;
+      } else if (child instanceof THREE.Points) {
+        const material = child.material as THREE.PointsMaterial;
+        material.color.set(layer.color);
+        material.opacity = layer.opacity;
+        material.transparent = layer.opacity < 1;
+        material.size = layer.strokeWidth * 0.05;
       }
     });
   }
@@ -303,18 +312,22 @@ export class SacredGeometryRenderer {
       let rotationY = layerMesh.baseRotation.y;
       let rotationZ = layerMesh.baseRotation.z;
 
-      rotationY += this.time * settings.globalRotationSpeed;
+      if (settings.globalRotationSpeed > 0) {
+        rotationY += this.time * settings.globalRotationSpeed;
+      }
+
+      let currentScale = layer.scale;
 
       if (layer.audioReactive && this.audioFeatures) {
         const bassScale = 1 + (this.audioFeatures.bass * settings.bassReactivity * 0.3);
-        layerMesh.group.scale.setScalar(layer.scale * bassScale);
+        currentScale *= bassScale;
 
         rotationZ += this.audioFeatures.energy * settings.energyReactivity * 0.05;
         rotationX += this.audioFeatures.highs * settings.highsReactivity * 0.02;
 
         if (settings.peakPulse && this.audioFeatures.peakTrigger) {
           const pulse = Math.sin(this.time * 20) * 0.1 + 1;
-          layerMesh.group.scale.multiplyScalar(pulse);
+          currentScale *= pulse;
         }
 
         layerMesh.group.traverse((child) => {
@@ -326,8 +339,18 @@ export class SacredGeometryRenderer {
             }
           }
         });
+      } else {
+        layerMesh.group.traverse((child) => {
+          if (child instanceof THREE.Line || child instanceof THREE.Mesh) {
+            const material = child.material as THREE.Material & { opacity?: number };
+            if (material.opacity !== undefined) {
+              material.opacity = layer.opacity;
+            }
+          }
+        });
       }
 
+      layerMesh.group.scale.setScalar(currentScale);
       layerMesh.group.rotation.set(rotationX, rotationY, rotationZ);
     });
 
