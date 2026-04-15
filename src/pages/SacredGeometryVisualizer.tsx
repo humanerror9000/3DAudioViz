@@ -42,6 +42,7 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
   const animationFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
+  const settingsRef = useRef<GeometrySettings>(defaultGeometrySettings);
 
   const [settings, setSettings] = useState<GeometrySettings>(defaultGeometrySettings);
   const [audioFeatures, setAudioFeatures] = useState<AudioFeatures>(DEFAULT_AUDIO_FEATURES);
@@ -111,7 +112,7 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
       }
 
       renderer.updateAudioFeatures(features);
-      renderer.render(deltaTime, settings);
+      renderer.render(deltaTime, settingsRef.current);
 
       animationFrameRef.current = requestAnimationFrame(animate);
     };
@@ -130,6 +131,7 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
   }, []);
 
   useEffect(() => {
+    settingsRef.current = settings;
     if (geometryRendererRef.current) {
       geometryRendererRef.current.updateSettings(settings);
       geometryRendererRef.current.updateLayers(settings.layers);
