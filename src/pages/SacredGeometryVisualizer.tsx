@@ -59,12 +59,19 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
   );
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current) {
+      console.error('Canvas ref is null');
+      return;
+    }
 
+    console.log('Initializing Sacred Geometry Visualizer');
     const canvas = canvasRef.current;
+    console.log('Canvas dimensions:', canvas.clientWidth, canvas.clientHeight);
+
     const renderer = new SacredGeometryRenderer();
     renderer.initialize(canvas, settings);
     geometryRendererRef.current = renderer;
+    console.log('Renderer initialized');
 
     const audioEngine = new AudioEngine();
     audioEngineRef.current = audioEngine;

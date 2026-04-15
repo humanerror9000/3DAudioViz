@@ -35,6 +35,8 @@ export class SacredGeometryRenderer {
   private audioFeatures: AudioFeatures | null = null;
 
   initialize(canvas: HTMLCanvasElement, settings: GeometrySettings): void {
+    console.log('SacredGeometryRenderer initialize called');
+
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -45,6 +47,7 @@ export class SacredGeometryRenderer {
 
     const width = canvas.clientWidth || window.innerWidth;
     const height = canvas.clientHeight || window.innerHeight;
+    console.log('Renderer size:', width, height);
     this.renderer.setSize(width, height);
 
     this.scene = new THREE.Scene();
@@ -78,7 +81,9 @@ export class SacredGeometryRenderer {
     this.bloomPass.enabled = settings.bloom;
     this.composer.addPass(this.bloomPass);
 
+    console.log('About to update layers with', settings.layers.length, 'layers');
     this.updateLayers(settings.layers);
+    console.log('Initialize complete, layer meshes count:', this.layerMeshes.size);
   }
 
   private createGeometry(type: GeometryType, subdivisions: number): GeometryPoints {
