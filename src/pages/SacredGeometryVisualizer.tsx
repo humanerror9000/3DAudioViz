@@ -59,19 +59,12 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
   );
 
   useEffect(() => {
-    if (!canvasRef.current) {
-      console.error('Canvas ref is null');
-      return;
-    }
+    if (!canvasRef.current) return;
 
-    console.log('Initializing Sacred Geometry Visualizer');
     const canvas = canvasRef.current;
-    console.log('Canvas dimensions:', canvas.clientWidth, canvas.clientHeight);
-
     const renderer = new SacredGeometryRenderer();
     renderer.initialize(canvas, settings);
     geometryRendererRef.current = renderer;
-    console.log('Renderer initialized');
 
     const audioEngine = new AudioEngine();
     audioEngineRef.current = audioEngine;
@@ -85,11 +78,10 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
     midiController.initialize().then((success) => {
       if (success) {
         setMidiState(prev => ({ ...prev, enabled: true, devices: midiController.getDevices() }));
+        midiController.setMessageCallback((ccNumber: number, value: number) => {
+          console.log('MIDI message:', ccNumber, value);
+        });
       }
-    });
-
-    midiController.onMIDIMessage((message) => {
-      console.log('MIDI message:', message);
     });
 
     const handleResize = () => {
