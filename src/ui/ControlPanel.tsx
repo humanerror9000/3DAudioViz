@@ -117,13 +117,7 @@ export function ControlPanel({
         {/* MIDI */}
         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
           <MIDIPanel
-            isSupported={midiState.isSupported}
-            hasAccess={midiState.hasAccess}
-            isInitializing={midiState.isInitializing}
-            devices={midiState.devices}
-            settings={midiState.settings}
-            learningParameterId={midiState.learningParameterId}
-            lastActivity={midiState.lastActivity}
+            midiState={midiState}
             onEnableChange={onMIDIEnableChange}
             onDeviceChange={onMIDIDeviceChange}
             onSmoothingChange={onMIDISmoothingChange}
