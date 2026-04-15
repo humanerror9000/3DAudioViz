@@ -69,10 +69,7 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
     const audioEngine = new AudioEngine();
     audioEngineRef.current = audioEngine;
 
-    const audioAnalyser = new AudioAnalyser(DEFAULT_AUDIO_SETTINGS);
-    audioAnalyserRef.current = audioAnalyser;
-
-    const recordingManager = new RecordingManager(canvas);
+    const recordingManager = new RecordingManager();
     recordingManagerRef.current = recordingManager;
 
     const midiController = new MIDIController();
@@ -104,13 +101,14 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
 
       let features = DEFAULT_AUDIO_FEATURES;
 
-      if (audioEngine.isPlaying()) {
-        const analyser = audioEngine.getAnalyser();
-        if (analyser) {
-          features = audioAnalyser.analyze(analyser);
+      if (audioEngine.isPlaying) {
+        const analyserNode = audioEngine.getAnalyserNode();
+        if (analyserNode && audioAnalyserRef.current) {
+          features = audioAnalyserRef.current.analyse(DEFAULT_AUDIO_SETTINGS);
           setAudioFeatures(features);
-          setCurrentTime(audioEngine.getCurrentTime());
         }
+        audioEngine.updateCurrentTime();
+        setCurrentTime(audioEngine.currentTime);
       }
 
       renderer.updateAudioFeatures(features);
@@ -126,7 +124,7 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
         cancelAnimationFrame(animationFrameRef.current);
       }
       renderer.dispose();
-      audioEngine.dispose();
+      audioEngine.cleanup();
       midiController.dispose();
       window.removeEventListener('resize', handleResize);
     };
@@ -145,7 +143,14 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
 
     try {
       await audioEngineRef.current.loadAudioFile(file);
-      setDuration(audioEngineRef.current.getDuration());
+
+      const analyserNode = audioEngineRef.current.getAnalyserNode();
+      const audioContext = audioEngineRef.current['audioContext'];
+      if (analyserNode && audioContext) {
+        audioAnalyserRef.current = new AudioAnalyser(analyserNode, audioContext.sampleRate);
+      }
+
+      setDuration(audioEngineRef.current.duration);
       await audioEngineRef.current.play();
       setIsPlaying(true);
     } catch (error) {
