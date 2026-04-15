@@ -12,6 +12,7 @@ import { HelpModal } from './ui/HelpModal';
 import { FullscreenHUD } from './ui/FullscreenHUD';
 import { SavePresetModal } from './ui/SavePresetModal';
 import { MediaReactor } from './pages/MediaReactor';
+import { FractalVisualizer } from './pages/FractalVisualizer';
 import {
   GeometryType,
   RenderStyle,
@@ -80,7 +81,7 @@ const DEFAULT_AUDIO_FEATURES: AudioFeatures = {
 };
 
 function App() {
-  const [mode, setMode] = useState<'visualizer' | 'mediaReactor'>('visualizer');
+  const [mode, setMode] = useState<'visualizer' | 'mediaReactor' | 'fractal'>('visualizer');
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -638,6 +639,10 @@ function App() {
     return <MediaReactor onBack={() => setMode('visualizer')} />;
   }
 
+  if (mode === 'fractal') {
+    return <FractalVisualizer onBack={() => setMode('visualizer')} />;
+  }
+
   return (
     <div className="w-full h-screen bg-black text-white overflow-hidden">
       <div ref={canvasContainerRef} className="absolute inset-0">
@@ -676,12 +681,20 @@ function App() {
             onFullscreen={handleFullscreen}
           />
 
-          <button
-            onClick={() => setMode('mediaReactor')}
-            className="absolute bottom-4 left-4 z-20 px-4 py-2 bg-blue-600 hover:bg-blue-700 border border-blue-400 rounded-lg transition-colors shadow-lg font-medium"
-          >
-            Media Reactor
-          </button>
+          <div className="absolute bottom-4 left-4 z-20 flex gap-3">
+            <button
+              onClick={() => setMode('mediaReactor')}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 border border-blue-400 rounded-lg transition-colors shadow-lg font-medium"
+            >
+              Media Reactor
+            </button>
+            <button
+              onClick={() => setMode('fractal')}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 border border-purple-400 rounded-lg transition-colors shadow-lg font-medium"
+            >
+              Fractal Visualizer
+            </button>
+          </div>
         </>
       )}
 
