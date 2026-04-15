@@ -14,6 +14,11 @@ import {
   createPlatonicSolid,
   createTorus,
   createMerkaba,
+  createHexagram,
+  createPentagram,
+  createEnneagram,
+  createCelticKnot,
+  createMandala,
   GeometryPoints
 } from '../utils/geometryBuilder';
 
@@ -109,6 +114,16 @@ export class SacredGeometryRenderer {
         return createTorus(1, 0.3, 32, 16);
       case 'merkaba':
         return createMerkaba();
+      case 'hexagram':
+        return createHexagram();
+      case 'pentagram':
+        return createPentagram();
+      case 'enneagram':
+        return createEnneagram();
+      case 'celtic-knot':
+        return createCelticKnot();
+      case 'mandala':
+        return createMandala(subdivisions);
       default:
         return createFlowerOfLife(3);
     }
@@ -118,12 +133,29 @@ export class SacredGeometryRenderer {
     const group = new THREE.Group();
     const geometryData = this.createGeometry(layer.geometryType, layer.subdivisions);
 
-    if (layer.renderMode === 'wireframe' || layer.renderMode === 'mixed') {
-      const lineMaterial = new THREE.LineBasicMaterial({
+    const lineMaterial = new THREE.LineBasicMaterial({
+      color: new THREE.Color(layer.color),
+      linewidth: layer.strokeWidth,
+      opacity: layer.opacity,
+      transparent: layer.opacity < 1
+    });
+
+    geometryData.edges.forEach(([startIdx, endIdx]) => {
+      const points = [
+        geometryData.vertices[startIdx],
+        geometryData.vertices[endIdx]
+      ];
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+      const line = new THREE.Line(lineGeometry, lineMaterial);
+      group.add(line);
+    });
+
+    if (layer.glowIntensity > 0) {
+      const glowMaterial = new THREE.LineBasicMaterial({
         color: new THREE.Color(layer.color),
-        linewidth: layer.strokeWidth,
-        opacity: layer.opacity,
-        transparent: layer.opacity < 1
+        linewidth: layer.strokeWidth * 2,
+        opacity: layer.opacity * layer.glowIntensity * 0.3,
+        transparent: true
       });
 
       geometryData.edges.forEach(([startIdx, endIdx]) => {
@@ -132,83 +164,9 @@ export class SacredGeometryRenderer {
           geometryData.vertices[endIdx]
         ];
         const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-        const line = new THREE.Line(lineGeometry, lineMaterial);
+        const line = new THREE.Line(lineGeometry, glowMaterial);
         group.add(line);
       });
-
-      if (layer.glowIntensity > 0) {
-        const glowMaterial = new THREE.LineBasicMaterial({
-          color: new THREE.Color(layer.color),
-          linewidth: layer.strokeWidth * 2,
-          opacity: layer.opacity * layer.glowIntensity * 0.3,
-          transparent: true
-        });
-
-        geometryData.edges.forEach(([startIdx, endIdx]) => {
-          const points = [
-            geometryData.vertices[startIdx],
-            geometryData.vertices[endIdx]
-          ];
-          const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-          const line = new THREE.Line(lineGeometry, glowMaterial);
-          group.add(line);
-        });
-      }
-    }
-
-    if (layer.renderMode === 'solid' || layer.renderMode === 'mixed') {
-      if (geometryData.faces && geometryData.faces.length > 0) {
-        const geometry = new THREE.BufferGeometry();
-        const positions: number[] = [];
-        const indices: number[] = [];
-
-        geometryData.vertices.forEach(v => {
-          positions.push(v.x, v.y, v.z);
-        });
-
-        geometryData.faces.forEach(face => {
-          for (let i = 1; i < face.length - 1; i++) {
-            indices.push(face[0], face[i], face[i + 1]);
-          }
-        });
-
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        geometry.setIndex(indices);
-        geometry.computeVertexNormals();
-
-        const material = new THREE.MeshPhongMaterial({
-          color: new THREE.Color(layer.color),
-          opacity: layer.opacity * 0.6,
-          transparent: true,
-          side: THREE.DoubleSide,
-          shininess: 30
-        });
-
-        const mesh = new THREE.Mesh(geometry, material);
-        group.add(mesh);
-      }
-    }
-
-    if (layer.renderMode === 'points') {
-      const pointsGeometry = new THREE.BufferGeometry();
-      const positions: number[] = [];
-
-      geometryData.vertices.forEach(v => {
-        positions.push(v.x, v.y, v.z);
-      });
-
-      pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-
-      const pointsMaterial = new THREE.PointsMaterial({
-        color: new THREE.Color(layer.color),
-        size: layer.strokeWidth * 0.05,
-        opacity: layer.opacity,
-        transparent: layer.opacity < 1,
-        sizeAttenuation: true
-      });
-
-      const points = new THREE.Points(pointsGeometry, pointsMaterial);
-      group.add(points);
     }
 
     group.position.set(...layer.position);
@@ -238,8 +196,17 @@ export class SacredGeometryRenderer {
 
     layers.forEach(layer => {
       const existing = this.layerMeshes.get(layer.id);
+      const existingLayer = existing ? layers.find(l => l.id === existing.id) : null;
 
-      if (!existing || existing.geometryType !== layer.geometryType) {
+      const needsRebuild = !existing ||
+        existing.geometryType !== layer.geometryType ||
+        (existingLayer && (
+          existingLayer.subdivisions !== layer.subdivisions ||
+          existingLayer.strokeWidth !== layer.strokeWidth ||
+          existingLayer.glowIntensity !== layer.glowIntensity
+        ));
+
+      if (needsRebuild) {
         if (existing) {
           this.scene!.remove(existing.group);
         }
@@ -319,33 +286,38 @@ export class SacredGeometryRenderer {
       let currentScale = layer.scale;
 
       if (layer.audioReactive && this.audioFeatures) {
-        const bassScale = 1 + (this.audioFeatures.bass * settings.bassReactivity * 0.3);
-        currentScale *= bassScale;
+        const bassScale = 1 + (this.audioFeatures.bass * settings.bassReactivity * 0.8);
+        const energyScale = 1 + (this.audioFeatures.energy * settings.energyReactivity * 0.4);
+        currentScale *= bassScale * energyScale;
 
-        rotationZ += this.audioFeatures.energy * settings.energyReactivity * 0.05;
-        rotationX += this.audioFeatures.highs * settings.highsReactivity * 0.02;
+        rotationZ += this.audioFeatures.energy * settings.energyReactivity * 0.15;
+        rotationX += this.audioFeatures.highs * settings.highsReactivity * 0.08;
+        rotationY += this.audioFeatures.mids * settings.energyReactivity * 0.05;
 
         if (settings.peakPulse && this.audioFeatures.peakTrigger) {
-          const pulse = Math.sin(this.time * 20) * 0.1 + 1;
+          const pulse = Math.sin(this.time * 20) * 0.3 + 1;
           currentScale *= pulse;
         }
 
         layerMesh.group.traverse((child) => {
-          if (child instanceof THREE.Line || child instanceof THREE.Mesh) {
-            const material = child.material as THREE.Material & { opacity?: number };
-            if (material.opacity !== undefined) {
-              const energyBoost = this.audioFeatures!.energy * 0.3;
-              material.opacity = Math.min(1, layer.opacity + energyBoost);
-            }
+          if (child instanceof THREE.Line) {
+            const material = child.material as THREE.LineBasicMaterial;
+            const energyBoost = this.audioFeatures!.energy * 0.5;
+            const bassBoost = this.audioFeatures!.bass * 0.3;
+            material.opacity = Math.min(1, layer.opacity + energyBoost + bassBoost);
+
+            const baseColor = new THREE.Color(layer.color);
+            const brightness = 1 + (this.audioFeatures!.energy * 0.8);
+            baseColor.multiplyScalar(brightness);
+            material.color.copy(baseColor);
           }
         });
       } else {
         layerMesh.group.traverse((child) => {
-          if (child instanceof THREE.Line || child instanceof THREE.Mesh) {
-            const material = child.material as THREE.Material & { opacity?: number };
-            if (material.opacity !== undefined) {
-              material.opacity = layer.opacity;
-            }
+          if (child instanceof THREE.Line) {
+            const material = child.material as THREE.LineBasicMaterial;
+            material.opacity = layer.opacity;
+            material.color.set(layer.color);
           }
         });
       }

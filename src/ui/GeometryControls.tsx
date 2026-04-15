@@ -1,5 +1,5 @@
 import { Layers, Plus, Trash2, Eye, EyeOff, Info } from 'lucide-react';
-import { GeometrySettings, GeometryLayer, GeometryType, RenderMode, ColorScheme, geometryInfo, colorSchemes } from '../types/geometry';
+import { GeometrySettings, GeometryLayer, GeometryType, ColorScheme, geometryInfo, colorSchemes } from '../types/geometry';
 
 interface GeometryControlsProps {
   settings: GeometrySettings;
@@ -23,7 +23,6 @@ export function GeometryControls({ settings, onSettingsChange, selectedLayerId, 
       opacity: 1.0,
       strokeWidth: 2.0,
       glowIntensity: 0.5,
-      renderMode: 'wireframe',
       subdivisions: 3,
       audioReactive: true
     };
@@ -177,20 +176,6 @@ export function GeometryControls({ settings, onSettingsChange, selectedLayerId, 
               {geometryTypes.map(type => (
                 <option key={type.value} value={type.value}>{type.label}</option>
               ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-xs text-gray-400">Render Mode</label>
-            <select
-              value={selectedLayer.renderMode}
-              onChange={(e) => updateLayer(selectedLayer.id, { renderMode: e.target.value as RenderMode })}
-              className="w-full bg-gray-700 rounded px-2 py-1 text-sm mt-1"
-            >
-              <option value="wireframe">Wireframe</option>
-              <option value="solid">Solid</option>
-              <option value="points">Points</option>
-              <option value="mixed">Mixed</option>
             </select>
           </div>
 

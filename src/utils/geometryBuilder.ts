@@ -436,3 +436,130 @@ export function createMerkaba(): GeometryPoints {
 
   return { vertices, edges };
 }
+
+export function createHexagram(): GeometryPoints {
+  const vertices: THREE.Vector3[] = [];
+  const edges: [number, number][] = [];
+  const radius = 1.5;
+
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * TAU;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    vertices.push(new THREE.Vector3(x, y, 0));
+  }
+
+  edges.push([0, 2], [2, 4], [4, 0]);
+  edges.push([1, 3], [3, 5], [5, 1]);
+
+  return { vertices, edges };
+}
+
+export function createPentagram(): GeometryPoints {
+  const vertices: THREE.Vector3[] = [];
+  const edges: [number, number][] = [];
+  const radius = 1.5;
+
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * TAU - Math.PI / 2;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    vertices.push(new THREE.Vector3(x, y, 0));
+  }
+
+  edges.push([0, 2], [2, 4], [4, 1], [1, 3], [3, 0]);
+
+  return { vertices, edges };
+}
+
+export function createEnneagram(): GeometryPoints {
+  const vertices: THREE.Vector3[] = [];
+  const edges: [number, number][] = [];
+  const radius = 1.5;
+
+  for (let i = 0; i < 9; i++) {
+    const angle = (i / 9) * TAU - Math.PI / 2;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    vertices.push(new THREE.Vector3(x, y, 0));
+  }
+
+  for (let i = 0; i < 9; i++) {
+    edges.push([i, (i + 1) % 9]);
+  }
+
+  edges.push([0, 3], [3, 6], [6, 0]);
+  edges.push([1, 4], [4, 7], [7, 1]);
+  edges.push([2, 5], [5, 8], [8, 2]);
+
+  return { vertices, edges };
+}
+
+export function createCelticKnot(): GeometryPoints {
+  const vertices: THREE.Vector3[] = [];
+  const edges: [number, number][] = [];
+  const radius = 1.2;
+  const innerRadius = 0.6;
+  const segments = 8;
+
+  for (let i = 0; i < segments; i++) {
+    const angle = (i / segments) * TAU;
+    const x1 = Math.cos(angle) * radius;
+    const y1 = Math.sin(angle) * radius;
+    const x2 = Math.cos(angle) * innerRadius;
+    const y2 = Math.sin(angle) * innerRadius;
+
+    vertices.push(new THREE.Vector3(x1, y1, 0));
+    vertices.push(new THREE.Vector3(x2, y2, 0));
+
+    const outerIdx = i * 2;
+    const innerIdx = i * 2 + 1;
+    const nextOuterIdx = ((i + 1) % segments) * 2;
+    const nextInnerIdx = ((i + 1) % segments) * 2 + 1;
+
+    edges.push([outerIdx, nextInnerIdx]);
+    edges.push([innerIdx, nextOuterIdx]);
+  }
+
+  return { vertices, edges };
+}
+
+export function createMandala(layers: number = 6): GeometryPoints {
+  const vertices: THREE.Vector3[] = [];
+  const edges: [number, number][] = [];
+  const petalCount = 8;
+
+  for (let layer = 1; layer <= layers; layer++) {
+    const layerRadius = (layer / layers) * 1.5;
+    const petalRadius = layerRadius * 0.3;
+
+    for (let i = 0; i < petalCount; i++) {
+      const angle = (i / petalCount) * TAU;
+      const centerX = Math.cos(angle) * layerRadius;
+      const centerY = Math.sin(angle) * layerRadius;
+
+      const petalSegments = 16;
+      const startIdx = vertices.length;
+
+      for (let j = 0; j <= petalSegments; j++) {
+        const petalAngle = (j / petalSegments) * TAU;
+        const x = centerX + Math.cos(petalAngle) * petalRadius;
+        const y = centerY + Math.sin(petalAngle) * petalRadius;
+        vertices.push(new THREE.Vector3(x, y, 0));
+
+        if (j > 0) {
+          edges.push([startIdx + j - 1, startIdx + j]);
+        }
+      }
+    }
+
+    const layerStart = vertices.length - petalCount * (petalSegments + 1);
+    for (let i = 0; i < petalCount; i++) {
+      const currentPetal = layerStart + i * (petalSegments + 1);
+      const nextPetal = layerStart + ((i + 1) % petalCount) * (petalSegments + 1);
+      edges.push([currentPetal, nextPetal]);
+    }
+  }
+
+  return { vertices, edges };
+}

@@ -11,9 +11,13 @@ export type GeometryType =
   | 'dodecahedron'
   | 'icosahedron'
   | 'torus'
-  | 'merkaba';
+  | 'merkaba'
+  | 'hexagram'
+  | 'pentagram'
+  | 'enneagram'
+  | 'celtic-knot'
+  | 'mandala';
 
-export type RenderMode = 'wireframe' | 'solid' | 'points' | 'mixed';
 export type ColorScheme = 'chakra' | 'rainbow' | 'monochrome' | 'golden' | 'cosmic' | 'custom';
 
 export interface GeometryLayer {
@@ -27,7 +31,6 @@ export interface GeometryLayer {
   opacity: number;
   strokeWidth: number;
   glowIntensity: number;
-  renderMode: RenderMode;
   subdivisions: number;
   audioReactive: boolean;
 }
@@ -64,7 +67,6 @@ export const defaultGeometryLayer: Omit<GeometryLayer, 'id'> = {
   opacity: 1.0,
   strokeWidth: 2.0,
   glowIntensity: 0.5,
-  renderMode: 'wireframe',
   subdivisions: 6,
   audioReactive: true
 };
@@ -160,5 +162,25 @@ export const geometryInfo: Record<GeometryType, { name: string; description: str
   'merkaba': {
     name: 'Merkaba',
     description: 'Counter-rotating tetrahedrons representing the light-body vehicle'
+  },
+  'hexagram': {
+    name: 'Hexagram',
+    description: 'Six-pointed star representing harmony of opposites'
+  },
+  'pentagram': {
+    name: 'Pentagram',
+    description: 'Five-pointed star representing the elements and protection'
+  },
+  'enneagram': {
+    name: 'Enneagram',
+    description: 'Nine-pointed symbol representing personality types and growth'
+  },
+  'celtic-knot': {
+    name: 'Celtic Knot',
+    description: 'Interwoven pattern representing eternity and interconnection'
+  },
+  'mandala': {
+    name: 'Mandala',
+    description: 'Circular pattern representing wholeness and the universe'
   }
 };
