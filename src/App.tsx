@@ -12,7 +12,7 @@ import { HelpModal } from './ui/HelpModal';
 import { FullscreenHUD } from './ui/FullscreenHUD';
 import { SavePresetModal } from './ui/SavePresetModal';
 import { MediaReactor } from './pages/MediaReactor';
-import { FractalVisualizer } from './pages/FractalVisualizer';
+import { SacredGeometryVisualizer } from './pages/SacredGeometryVisualizer';
 import {
   GeometryType,
   RenderStyle,
@@ -81,7 +81,7 @@ const DEFAULT_AUDIO_FEATURES: AudioFeatures = {
 };
 
 function App() {
-  const [mode, setMode] = useState<'visualizer' | 'mediaReactor' | 'fractal'>('visualizer');
+  const [mode, setMode] = useState<'visualizer' | 'mediaReactor' | 'sacredGeometry'>('visualizer');
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -639,8 +639,8 @@ function App() {
     return <MediaReactor onBack={() => setMode('visualizer')} />;
   }
 
-  if (mode === 'fractal') {
-    return <FractalVisualizer onBack={() => setMode('visualizer')} />;
+  if (mode === 'sacredGeometry') {
+    return <SacredGeometryVisualizer onBack={() => setMode('visualizer')} />;
   }
 
   return (
@@ -689,10 +689,10 @@ function App() {
               Media Reactor
             </button>
             <button
-              onClick={() => setMode('fractal')}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 border border-purple-400 rounded-lg transition-colors shadow-lg font-medium"
+              onClick={() => setMode('sacredGeometry')}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 border border-amber-400 rounded-lg transition-colors shadow-lg font-medium"
             >
-              Fractal Visualizer
+              Sacred Geometry
             </button>
           </div>
         </>
