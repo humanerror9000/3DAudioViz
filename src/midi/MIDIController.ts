@@ -11,7 +11,6 @@ export class MIDIController {
 
   async initialize(): Promise<boolean> {
     if (!navigator.requestMIDIAccess) {
-      console.warn('Web MIDI API not supported');
       return false;
     }
 
@@ -27,33 +26,16 @@ export class MIDIController {
 
   private setupInputListeners(): void {
     if (!this.midiAccess) {
-      console.error('❌ No MIDI access available');
       return;
     }
 
-    console.log('🔧 Setting up MIDI input listeners...');
-    console.log('📊 Number of inputs:', this.midiAccess.inputs.size);
-
     this.midiAccess.inputs.forEach((input) => {
-      console.log('🎛️ Setting up listener for input:', {
-        name: input.name,
-        id: input.id,
-        manufacturer: input.manufacturer,
-        state: input.state
-      });
-
       input.onmidimessage = (event) => {
-        console.log('🔴 MIDI EVENT FIRED!', {
-          device: input.name,
-          data: Array.from(event.data),
-          timestamp: event.timeStamp
-        });
         this.handleMIDIMessage(event, input.id);
       };
     });
 
-    this.midiAccess.onstatechange = (event) => {
-      console.log('🔄 MIDI state changed:', event);
+    this.midiAccess.onstatechange = () => {
       this.setupInputListeners();
     };
   }
@@ -62,26 +44,11 @@ export class MIDIController {
     const [status, data1, data2] = event.data;
     const command = status & 0xf0;
 
-    console.log('🎹 RAW MIDI message received:', {
-      status: status.toString(16),
-      command: command.toString(16),
-      data1,
-      data2,
-      deviceId,
-      hasCallback: !!this.messageCallback,
-      selectedDeviceId: this.selectedDeviceId
-    });
-
     if (!this.messageCallback) {
-      console.warn('⚠️ No callback registered!');
       return;
     }
 
     if (this.selectedDeviceId && this.selectedDeviceId !== 'all' && this.selectedDeviceId !== deviceId) {
-      console.log('🚫 Message filtered - device mismatch:', {
-        selectedDeviceId: this.selectedDeviceId,
-        messageDeviceId: deviceId
-      });
       return;
     }
 
@@ -96,10 +63,7 @@ export class MIDIController {
         this.smoothedValues.set(key, value);
       }
 
-      console.log('✅ Calling MIDI callback with CC:', ccNumber, 'value:', value);
       this.messageCallback(ccNumber, value, deviceId);
-    } else {
-      console.log('ℹ️ Ignoring non-CC message (command:', command.toString(16), ')');
     }
   }
 
@@ -120,12 +84,10 @@ export class MIDIController {
   }
 
   setMessageCallback(callback: MIDIMessageCallback): void {
-    console.log('📞 Setting MIDI callback:', !!callback);
     this.messageCallback = callback;
   }
 
   setSelectedDevice(deviceId: string | null): void {
-    console.log('🎹 Setting selected device:', deviceId);
     this.selectedDeviceId = deviceId;
   }
 

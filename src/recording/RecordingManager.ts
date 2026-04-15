@@ -155,11 +155,10 @@ export class RecordingManager {
         }
       }, 100);
 
-    } catch (error) {
+    } catch {
       if (this.onError) {
         this.onError('Failed to start recording');
       }
-      console.error('Recording error:', error);
     }
   }
 

@@ -121,8 +121,7 @@ export function MediaReactor({ onBack }: MediaReactorProps) {
       setRecordingTime(seconds);
     });
 
-    recordingManagerRef.current.setErrorCallback((message) => {
-      console.error('Recording error:', message);
+    recordingManagerRef.current.setErrorCallback(() => {
       setIsRecording(false);
       setRecordingTime(0);
     });
@@ -581,9 +580,7 @@ export function MediaReactor({ onBack }: MediaReactorProps) {
 
         setMediaFileName(file.name);
 
-        video.play().catch(err => {
-          console.warn('Video autoplay failed:', err);
-        });
+        video.play().catch(() => {});
       } else {
         const img = new Image();
         img.src = url;
@@ -611,8 +608,7 @@ export function MediaReactor({ onBack }: MediaReactorProps) {
 
         setMediaFileName(file.name);
       }
-    } catch (error) {
-      console.error('Failed to load media file:', error);
+    } catch {
       alert('Failed to load media file. Please try again.');
     } finally {
       e.target.value = '';
@@ -637,8 +633,7 @@ export function MediaReactor({ onBack }: MediaReactorProps) {
       setAudioFileName(file.name);
       setDuration(audioEngineRef.current.duration);
       setCurrentTime(0);
-    } catch (err) {
-      console.error('Failed to load audio file:', err);
+    } catch {
       alert('Failed to load audio file. Please try again.');
     } finally {
       e.target.value = '';

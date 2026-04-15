@@ -22,8 +22,7 @@ export function loadMIDISettings(): MIDISettings {
       ...parsed,
       learnMode: false
     };
-  } catch (error) {
-    console.error('Failed to load MIDI settings:', error);
+  } catch {
     return { ...DEFAULT_MIDI_SETTINGS };
   }
 }
@@ -31,8 +30,7 @@ export function loadMIDISettings(): MIDISettings {
 export function saveMIDISettings(settings: MIDISettings): void {
   try {
     localStorage.setItem(MIDI_SETTINGS_KEY, JSON.stringify(settings));
-  } catch (error) {
-    console.error('Failed to save MIDI settings:', error);
+  } catch {
   }
 }
 

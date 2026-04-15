@@ -626,7 +626,9 @@ function App() {
   const handleFullscreen = () => {
     if (!canvasContainerRef.current) return;
     if (!document.fullscreenElement) {
-      canvasContainerRef.current.requestFullscreen().catch((e) => console.error('Fullscreen error:', e));
+      canvasContainerRef.current.requestFullscreen().catch((e) => {
+        console.error('Fullscreen error:', e);
+      });
     } else {
       document.exitFullscreen();
     }

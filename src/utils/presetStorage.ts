@@ -139,8 +139,7 @@ export function loadPresets(): Preset[] {
       return defaultPresets;
     }
     return JSON.parse(stored);
-  } catch (error) {
-    console.error('Failed to load presets:', error);
+  } catch {
     return defaultPresets;
   }
 }

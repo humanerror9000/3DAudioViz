@@ -1,4 +1,4 @@
-import { Music2, Trash2, Circle, AlertCircle } from 'lucide-react';
+import { Music2, Trash2, Circle } from 'lucide-react';
 import { MIDIState } from '../types/midi';
 
 interface MIDIPanelProps {
@@ -107,71 +107,6 @@ export function MIDIPanel({
               className="w-full"
             />
           </div>
-
-          <button
-            onClick={async () => {
-              console.clear();
-              console.log('🧪 === MIDI DEBUG TEST STARTED ===');
-              console.log('🎹 Devices from React state:', devices);
-              console.log('⚙️ Settings:', settings);
-              console.log('📊 Has Access:', hasAccess);
-              console.log('🔧 Is Initializing:', isInitializing);
-
-              // Direct browser API test
-              try {
-                console.log('🔍 Testing direct browser MIDI API...');
-                const access = await navigator.requestMIDIAccess();
-                console.log('✅ Got MIDI Access directly from browser');
-                console.log('📊 Browser inputs.size:', access.inputs.size);
-
-                let inputCount = 0;
-                access.inputs.forEach((input) => {
-                  inputCount++;
-                  console.log(`🎹 Browser Input #${inputCount}:`, {
-                    name: input.name,
-                    id: input.id,
-                    manufacturer: input.manufacturer,
-                    state: input.state,
-                    connection: input.connection
-                  });
-
-                  // Add raw listener
-                  input.onmidimessage = (event) => {
-                    console.log('🔴🔴🔴 DIRECT BROWSER MIDI EVENT!', {
-                      device: input.name,
-                      data: Array.from(event.data),
-                      hex: Array.from(event.data).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')
-                    });
-                  };
-                });
-
-                console.log('💡 NOW TURN ANY KNOB ON YOUR MIDI CONTROLLER!');
-                console.log('🧪 === Waiting for MIDI input... ===');
-
-                const deviceInfo = inputCount > 0
-                  ? `Found ${inputCount} input(s) in browser`
-                  : '❌ NO INPUTS IN BROWSER!';
-
-                alert(
-                  `MIDI Test Results:\n\n` +
-                  `${deviceInfo}\n\n` +
-                  `React State Says:\n` +
-                  `- Devices: ${devices.length}\n` +
-                  `- Has Access: ${hasAccess}\n` +
-                  `- Selected: ${settings.selectedDeviceId || 'All Inputs'}\n\n` +
-                  `Console cleared.\nNOW TURN A KNOB!\n\n` +
-                  `Look for: "🔴🔴🔴 DIRECT BROWSER MIDI EVENT!"`
-                );
-              } catch (err) {
-                console.error('❌ Browser MIDI API test failed:', err);
-                alert(`ERROR: Cannot access MIDI!\n\n${err}`);
-              }
-            }}
-            className="w-full px-3 py-2 bg-blue-600/50 hover:bg-blue-600/70 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-          >
-            <AlertCircle size={16} />
-            Test MIDI Connection
-          </button>
 
           <div className="pt-2 border-t border-white/10">
             <button

@@ -22,8 +22,7 @@ export function loadMediaReactorMIDISettings(): MIDISettings {
       ...parsed,
       learnMode: false
     };
-  } catch (error) {
-    console.error('Failed to load Media Reactor MIDI settings:', error);
+  } catch {
     return { ...DEFAULT_MIDI_SETTINGS };
   }
 }
@@ -31,8 +30,7 @@ export function loadMediaReactorMIDISettings(): MIDISettings {
 export function saveMediaReactorMIDISettings(settings: MIDISettings): void {
   try {
     localStorage.setItem(MEDIA_REACTOR_MIDI_SETTINGS_KEY, JSON.stringify(settings));
-  } catch (error) {
-    console.error('Failed to save Media Reactor MIDI settings:', error);
+  } catch {
   }
 }
 
