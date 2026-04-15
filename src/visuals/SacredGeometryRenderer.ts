@@ -42,14 +42,17 @@ export class SacredGeometryRenderer {
       powerPreference: 'high-performance'
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+
+    const width = canvas.clientWidth || window.innerWidth;
+    const height = canvas.clientHeight || window.innerHeight;
+    this.renderer.setSize(width, height);
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(settings.backgroundColor);
 
     this.camera = new THREE.PerspectiveCamera(
       75,
-      canvas.clientWidth / canvas.clientHeight,
+      width / height,
       0.1,
       1000
     );
@@ -67,7 +70,7 @@ export class SacredGeometryRenderer {
     this.composer.addPass(renderPass);
 
     this.bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
+      new THREE.Vector2(width, height),
       settings.bloomStrength,
       settings.bloomRadius,
       settings.bloomThreshold
