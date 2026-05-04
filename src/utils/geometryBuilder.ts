@@ -1,565 +1,484 @@
-import * as THREE from 'three';
+// src/utils/geometryBuilder.ts
+// Islamic / Girih geometric pattern drawing utilities for Canvas 2D
 
-export const PHI = (1 + Math.sqrt(5)) / 2;
-export const TAU = Math.PI * 2;
+export const TAU = Math.PI * 2
+export const PHI = (1 + Math.sqrt(5)) / 2
 
-export interface CircleParams {
-  center: [number, number];
-  radius: number;
-  segments?: number;
+// ── Colour helpers ──────────────────────────────────────────────────────────
+
+/** Lerp between two hex colours, returning an rgba string */
+export function lerpColor(a: string, b: string, t: number, alpha = 1): string {
+  const ca = hexToRgb(a)
+  const cb = hexToRgb(b)
+  const r = Math.round(ca[0] + (cb[0] - ca[0]) * t)
+  const g = Math.round(ca[1] + (cb[1] - ca[1]) * t)
+  const bl = Math.round(ca[2] + (cb[2] - ca[2]) * t)
+  return `rgba(${r},${g},${bl},${alpha})`
 }
 
-export interface GeometryPoints {
-  vertices: THREE.Vector3[];
-  edges: [number, number][];
-  faces?: number[][];
+export function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '')
+  return [
+    parseInt(h.substring(0, 2), 16),
+    parseInt(h.substring(2, 4), 16),
+    parseInt(h.substring(4, 6), 16)
+  ]
 }
 
-export function createCirclePoints(params: CircleParams): THREE.Vector3[] {
-  const { center, radius, segments = 64 } = params;
-  const points: THREE.Vector3[] = [];
+/** Map energy (0–1) through a 4-stop palette */
+export function energyToColor(
+  palette: [string, string, string, string],
+  energy: number,
+  alpha = 1
+): string {
+  const t = Math.max(0, Math.min(1, energy))
+  if (t < 0.33) return lerpColor(palette[0], palette[1], t / 0.33, alpha)
+  if (t < 0.66) return lerpColor(palette[1], palette[2], (t - 0.33) / 0.33, alpha)
+  return lerpColor(palette[2], palette[3], (t - 0.66) / 0.34, alpha)
+}
 
-  for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * TAU;
-    const x = center[0] + Math.cos(angle) * radius;
-    const y = center[1] + Math.sin(angle) * radius;
-    points.push(new THREE.Vector3(x, y, 0));
+// ── Canvas context helpers ───────────────────────────────────────────────────
+
+export function setGlow(ctx: CanvasRenderingContext2D, color: string, radius: number) {
+  ctx.shadowColor = color
+  ctx.shadowBlur = radius
+}
+
+export function clearGlow(ctx: CanvasRenderingContext2D) {
+  ctx.shadowBlur = 0
+}
+
+// ── Core star polygon geometry ───────────────────────────────────────────────
+
+/**
+ * Returns the vertices of an n-pointed star polygon.
+ * outerR = radius of outer points
+ * innerR = radius of inner notches (default = outerR * sin(π/n) / sin(2π/n))
+ */
+export function starPolygonPoints(
+  n: number,
+  outerR: number,
+  innerR?: number,
+  offsetAngle = 0
+): Array<[number, number]> {
+  const inner = innerR ?? outerR * Math.sin(Math.PI / n) / Math.sin(2 * Math.PI / n)
+  const pts: Array<[number, number]> = []
+  for (let i = 0; i < n * 2; i++) {
+    const angle = offsetAngle + (i * Math.PI) / n - Math.PI / 2
+    const r = i % 2 === 0 ? outerR : inner
+    pts.push([Math.cos(angle) * r, Math.sin(angle) * r])
+  }
+  return pts
+}
+
+/** Draw a closed polygon path (does not stroke/fill) */
+export function polygonPath(ctx: CanvasRenderingContext2D, pts: Array<[number, number]>) {
+  ctx.beginPath()
+  ctx.moveTo(pts[0][0], pts[0][1])
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1])
+  ctx.closePath()
+}
+
+// ── Girih star drawing functions ─────────────────────────────────────────────
+
+/**
+ * Draw a girih n-pointed star with radial connecting lines.
+ * This is the canonical Islamic geometric star motif.
+ * cx, cy = center; r = outer radius; completion = 0–1 (line draw progress)
+ */
+export function drawGirihStar(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  n: number,
+  completion: number,
+  strokeColor: string,
+  strokeWidth: number,
+  glowRadius: number,
+  offsetAngle = 0
+) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.strokeStyle = strokeColor
+  ctx.lineWidth = strokeWidth
+  setGlow(ctx, strokeColor, glowRadius)
+  ctx.lineCap = 'round'
+
+  const outerPts = starPolygonPoints(n, r, r * 0.382, offsetAngle)
+  const totalSegments = outerPts.length
+  const drawnSegments = Math.floor(totalSegments * completion)
+
+  ctx.beginPath()
+  outerPts.slice(0, drawnSegments + 1).forEach((pt, i) => {
+    if (i === 0) ctx.moveTo(pt[0], pt[1])
+    else ctx.lineTo(pt[0], pt[1])
+  })
+  if (completion >= 1) ctx.closePath()
+  ctx.stroke()
+
+  // Inner connecting lines — only appear at higher completion
+  if (completion > 0.6) {
+    const innerCompletion = (completion - 0.6) / 0.4
+    const innerR = r * 0.382
+    ctx.globalAlpha = innerCompletion * 0.7
+    for (let i = 0; i < n; i++) {
+      const angle = offsetAngle + (i * TAU) / n - Math.PI / 2
+      const x2 = Math.cos(angle) * innerR
+      const y2 = Math.sin(angle) * innerR
+      ctx.beginPath()
+      ctx.moveTo(0, 0)
+      ctx.lineTo(x2, y2)
+      ctx.stroke()
+    }
+    ctx.globalAlpha = 1
   }
 
-  return points;
+  ctx.restore()
 }
 
-export function createFlowerOfLife(rings: number = 3): GeometryPoints {
-  const radius = 1;
-  const circles: CircleParams[] = [];
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
+/**
+ * Draw a full girih tile field — interlocking n-pointed stars tiling the canvas.
+ * This creates the infinite zellige mosaic effect.
+ */
+export function drawGirihField(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  n: number,
+  tileSize: number,
+  time: number,
+  energy: number,
+  bass: number,
+  completion: number,
+  strokeColor: string,
+  strokeWidth: number,
+  glowRadius: number
+) {
+  const cx = width / 2
+  const cy = height / 2
+  const cols = Math.ceil(width / tileSize) + 2
+  const rows = Math.ceil(height / tileSize) + 2
 
-  circles.push({ center: [0, 0], radius });
+  for (let row = -1; row < rows; row++) {
+    for (let col = -1; col < cols; col++) {
+      const x = col * tileSize - (tileSize / 2)
+      const y = row * tileSize - (tileSize / 2)
+
+      // Distance from center for ripple effect
+      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+      const ripple = Math.sin(dist * 0.02 - time * 2) * bass * 0.1
+      const tileCompletion = Math.max(0, Math.min(1, completion + ripple))
+
+      drawGirihStar(
+        ctx, x, y, tileSize * 0.45,
+        n, tileCompletion,
+        strokeColor, strokeWidth, glowRadius * 0.5,
+        time * 0.1
+      )
+    }
+  }
+}
+
+// ── Arabesque (interlaced strapwork) ─────────────────────────────────────────
+
+/**
+ * Draw arabesque interlaced ribbon pattern using bezier curves.
+ * The classic Islamic strapwork — overlapping bands that weave over/under.
+ */
+export function drawArabesque(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  folds: number,
+  time: number,
+  energy: number,
+  completion: number,
+  strokeColor: string,
+  strokeWidth: number,
+  glowRadius: number
+) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.strokeStyle = strokeColor
+  ctx.lineWidth = strokeWidth
+  ctx.lineCap = 'round'
+  setGlow(ctx, strokeColor, glowRadius)
+
+  const segments = folds * 2
+  const angleStep = TAU / segments
+
+  for (let i = 0; i < Math.floor(segments * completion); i++) {
+    const a1 = i * angleStep + time * 0.05
+    const a2 = a1 + angleStep
+
+    const x1 = Math.cos(a1) * r * 0.5
+    const y1 = Math.sin(a1) * r * 0.5
+    const x2 = Math.cos(a2) * r * 0.5
+    const y2 = Math.sin(a2) * r * 0.5
+
+    // Control points create the flowing arabesque curve
+    const cx1 = Math.cos(a1 + angleStep * 0.5) * r * (0.8 + energy * 0.2)
+    const cy1 = Math.sin(a1 + angleStep * 0.5) * r * (0.8 + energy * 0.2)
+
+    ctx.beginPath()
+    ctx.moveTo(x1, y1)
+    ctx.quadraticCurveTo(cx1, cy1, x2, y2)
+    ctx.stroke()
+
+    // Connecting spokes
+    if (completion > 0.7) {
+      ctx.globalAlpha = (completion - 0.7) / 0.3 * 0.5
+      ctx.beginPath()
+      ctx.moveTo(x1, y1)
+      ctx.lineTo(0, 0)
+      ctx.stroke()
+      ctx.globalAlpha = 1
+    }
+  }
+
+  ctx.restore()
+}
+
+// ── Muqarnas (stalactite geometry) ──────────────────────────────────────────
+
+/**
+ * Muqarnas: radiating honeycomb-like geometry emanating from center.
+ * Mimics the architectural stalactite vaulting of Islamic mosques.
+ */
+export function drawMuqarnas(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  folds: number,
+  time: number,
+  energy: number,
+  rings: number,
+  completion: number,
+  strokeColor: string,
+  strokeWidth: number,
+  glowRadius: number
+) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.strokeStyle = strokeColor
+  ctx.lineWidth = strokeWidth
+  setGlow(ctx, strokeColor, glowRadius)
+
+  const angleStep = TAU / folds
 
   for (let ring = 1; ring <= rings; ring++) {
-    const numCircles = ring * 6;
-    const ringRadius = radius * 2 * ring;
+    if (ring > completion * rings) break
+    const ringR = (ring / rings) * r
+    const ringCompletion = Math.min(1, completion * rings - (ring - 1))
 
-    for (let i = 0; i < numCircles; i++) {
-      const angle = (i / numCircles) * TAU;
-      const x = Math.cos(angle) * ringRadius;
-      const y = Math.sin(angle) * ringRadius;
-      circles.push({ center: [x, y], radius });
-    }
-  }
+    for (let i = 0; i < Math.floor(folds * ringCompletion); i++) {
+      const a = i * angleStep + time * 0.03 * (ring % 2 === 0 ? 1 : -1)
 
-  circles.forEach((circle, circleIdx) => {
-    const circlePoints = createCirclePoints(circle);
-    const startIdx = vertices.length;
-    vertices.push(...circlePoints);
+      // Hexagonal cell vertices
+      const x1 = Math.cos(a) * ringR
+      const y1 = Math.sin(a) * ringR
+      const x2 = Math.cos(a + angleStep) * ringR
+      const y2 = Math.sin(a + angleStep) * ringR
+      const xMid = Math.cos(a + angleStep / 2) * ringR * 1.1
+      const yMid = Math.sin(a + angleStep / 2) * ringR * 1.1
 
-    for (let i = 0; i < circlePoints.length - 1; i++) {
-      edges.push([startIdx + i, startIdx + i + 1]);
-    }
-  });
+      ctx.beginPath()
+      ctx.moveTo(x1, y1)
+      ctx.lineTo(xMid, yMid)
+      ctx.lineTo(x2, y2)
+      ctx.stroke()
 
-  return { vertices, edges };
-}
-
-export function createSeedOfLife(): GeometryPoints {
-  const radius = 1;
-  const circles: CircleParams[] = [];
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
-
-  circles.push({ center: [0, 0], radius });
-
-  for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * TAU;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    circles.push({ center: [x, y], radius });
-  }
-
-  circles.forEach((circle) => {
-    const circlePoints = createCirclePoints(circle);
-    const startIdx = vertices.length;
-    vertices.push(...circlePoints);
-
-    for (let i = 0; i < circlePoints.length - 1; i++) {
-      edges.push([startIdx + i, startIdx + i + 1]);
-    }
-  });
-
-  return { vertices, edges };
-}
-
-export function createMetatronsCube(): GeometryPoints {
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
-
-  const seedOfLife = createSeedOfLife();
-
-  const intersectionPoints: THREE.Vector3[] = [
-    new THREE.Vector3(0, 0, 0)
-  ];
-
-  for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * TAU;
-    intersectionPoints.push(new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0));
-  }
-
-  for (let i = 0; i < 6; i++) {
-    const angle = ((i + 0.5) / 6) * TAU;
-    const innerAngle = angle + Math.PI / 6;
-    intersectionPoints.push(new THREE.Vector3(
-      Math.cos(innerAngle) * 0.5,
-      Math.sin(innerAngle) * 0.5,
-      0
-    ));
-  }
-
-  vertices.push(...intersectionPoints);
-
-  for (let i = 1; i < intersectionPoints.length; i++) {
-    edges.push([0, i]);
-  }
-
-  for (let i = 1; i <= 6; i++) {
-    const next = i === 6 ? 1 : i + 1;
-    edges.push([i, next]);
-  }
-
-  for (let i = 7; i <= 12; i++) {
-    const next = i === 12 ? 7 : i + 1;
-    edges.push([i, next]);
-  }
-
-  for (let i = 1; i <= 6; i++) {
-    edges.push([i, i + 6]);
-  }
-
-  return { vertices, edges };
-}
-
-export function createVesicaPiscis(): GeometryPoints {
-  const radius = 1;
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
-
-  const circle1 = createCirclePoints({ center: [-radius / 2, 0], radius });
-  const circle2 = createCirclePoints({ center: [radius / 2, 0], radius });
-
-  const startIdx1 = vertices.length;
-  vertices.push(...circle1);
-  for (let i = 0; i < circle1.length - 1; i++) {
-    edges.push([startIdx1 + i, startIdx1 + i + 1]);
-  }
-
-  const startIdx2 = vertices.length;
-  vertices.push(...circle2);
-  for (let i = 0; i < circle2.length - 1; i++) {
-    edges.push([startIdx2 + i, startIdx2 + i + 1]);
-  }
-
-  return { vertices, edges };
-}
-
-export function createGoldenSpiral(turns: number = 3): GeometryPoints {
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
-  const pointsPerTurn = 100;
-  const totalPoints = pointsPerTurn * turns;
-
-  for (let i = 0; i <= totalPoints; i++) {
-    const theta = (i / pointsPerTurn) * TAU;
-    const r = Math.pow(PHI, theta / Math.PI);
-    const scale = 0.2;
-    const x = r * Math.cos(theta) * scale;
-    const y = r * Math.sin(theta) * scale;
-
-    vertices.push(new THREE.Vector3(x, y, 0));
-
-    if (i > 0) {
-      edges.push([i - 1, i]);
-    }
-  }
-
-  return { vertices, edges };
-}
-
-export function createSriYantra(): GeometryPoints {
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
-
-  const outerCirclePoints = createCirclePoints({ center: [0, 0], radius: 2 });
-  let startIdx = vertices.length;
-  vertices.push(...outerCirclePoints);
-  for (let i = 0; i < outerCirclePoints.length - 1; i++) {
-    edges.push([startIdx + i, startIdx + i + 1]);
-  }
-
-  const innerCirclePoints = createCirclePoints({ center: [0, 0], radius: 1.8 });
-  startIdx = vertices.length;
-  vertices.push(...innerCirclePoints);
-  for (let i = 0; i < innerCirclePoints.length - 1; i++) {
-    edges.push([startIdx + i, startIdx + i + 1]);
-  }
-
-  const triangleScale = 1.5;
-  const upwardTriangles = [
-    [
-      new THREE.Vector3(0, triangleScale, 0),
-      new THREE.Vector3(-triangleScale * 0.866, -triangleScale * 0.5, 0),
-      new THREE.Vector3(triangleScale * 0.866, -triangleScale * 0.5, 0)
-    ],
-    [
-      new THREE.Vector3(0, triangleScale * 0.7, 0),
-      new THREE.Vector3(-triangleScale * 0.6, -triangleScale * 0.35, 0),
-      new THREE.Vector3(triangleScale * 0.6, -triangleScale * 0.35, 0)
-    ],
-    [
-      new THREE.Vector3(0, triangleScale * 0.4, 0),
-      new THREE.Vector3(-triangleScale * 0.35, -triangleScale * 0.2, 0),
-      new THREE.Vector3(triangleScale * 0.35, -triangleScale * 0.2, 0)
-    ],
-    [
-      new THREE.Vector3(0, triangleScale * 0.2, 0),
-      new THREE.Vector3(-triangleScale * 0.17, -triangleScale * 0.1, 0),
-      new THREE.Vector3(triangleScale * 0.17, -triangleScale * 0.1, 0)
-    ]
-  ];
-
-  const downwardTriangles = [
-    [
-      new THREE.Vector3(0, -triangleScale, 0),
-      new THREE.Vector3(-triangleScale * 0.866, triangleScale * 0.5, 0),
-      new THREE.Vector3(triangleScale * 0.866, triangleScale * 0.5, 0)
-    ],
-    [
-      new THREE.Vector3(0, -triangleScale * 0.7, 0),
-      new THREE.Vector3(-triangleScale * 0.6, triangleScale * 0.35, 0),
-      new THREE.Vector3(triangleScale * 0.6, triangleScale * 0.35, 0)
-    ],
-    [
-      new THREE.Vector3(0, -triangleScale * 0.4, 0),
-      new THREE.Vector3(-triangleScale * 0.35, triangleScale * 0.2, 0),
-      new THREE.Vector3(triangleScale * 0.35, triangleScale * 0.2, 0)
-    ],
-    [
-      new THREE.Vector3(0, -triangleScale * 0.2, 0),
-      new THREE.Vector3(-triangleScale * 0.17, triangleScale * 0.1, 0),
-      new THREE.Vector3(triangleScale * 0.17, triangleScale * 0.1, 0)
-    ],
-    [
-      new THREE.Vector3(0, -triangleScale * 0.1, 0),
-      new THREE.Vector3(-triangleScale * 0.09, triangleScale * 0.05, 0),
-      new THREE.Vector3(triangleScale * 0.09, triangleScale * 0.05, 0)
-    ]
-  ];
-
-  [...upwardTriangles, ...downwardTriangles].forEach(triangle => {
-    const idx = vertices.length;
-    vertices.push(...triangle);
-    edges.push([idx, idx + 1]);
-    edges.push([idx + 1, idx + 2]);
-    edges.push([idx + 2, idx]);
-  });
-
-  return { vertices, edges };
-}
-
-export function createPlatonicSolid(type: 'tetrahedron' | 'cube' | 'octahedron' | 'dodecahedron' | 'icosahedron'): GeometryPoints {
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
-  const faces: number[][] = [];
-
-  switch (type) {
-    case 'tetrahedron': {
-      const a = 1 / Math.sqrt(3);
-      vertices.push(
-        new THREE.Vector3(a, a, a),
-        new THREE.Vector3(a, -a, -a),
-        new THREE.Vector3(-a, a, -a),
-        new THREE.Vector3(-a, -a, a)
-      );
-      edges.push([0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]);
-      faces.push([0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]);
-      break;
-    }
-
-    case 'cube': {
-      vertices.push(
-        new THREE.Vector3(-1, -1, -1),
-        new THREE.Vector3(1, -1, -1),
-        new THREE.Vector3(1, 1, -1),
-        new THREE.Vector3(-1, 1, -1),
-        new THREE.Vector3(-1, -1, 1),
-        new THREE.Vector3(1, -1, 1),
-        new THREE.Vector3(1, 1, 1),
-        new THREE.Vector3(-1, 1, 1)
-      );
-      edges.push(
-        [0, 1], [1, 2], [2, 3], [3, 0],
-        [4, 5], [5, 6], [6, 7], [7, 4],
-        [0, 4], [1, 5], [2, 6], [3, 7]
-      );
-      faces.push(
-        [0, 1, 2, 3], [4, 5, 6, 7],
-        [0, 1, 5, 4], [2, 3, 7, 6],
-        [0, 3, 7, 4], [1, 2, 6, 5]
-      );
-      break;
-    }
-
-    case 'octahedron': {
-      vertices.push(
-        new THREE.Vector3(1, 0, 0),
-        new THREE.Vector3(-1, 0, 0),
-        new THREE.Vector3(0, 1, 0),
-        new THREE.Vector3(0, -1, 0),
-        new THREE.Vector3(0, 0, 1),
-        new THREE.Vector3(0, 0, -1)
-      );
-      edges.push(
-        [0, 2], [0, 3], [0, 4], [0, 5],
-        [1, 2], [1, 3], [1, 4], [1, 5],
-        [2, 4], [2, 5], [3, 4], [3, 5]
-      );
-      faces.push(
-        [0, 2, 4], [0, 4, 3], [0, 3, 5], [0, 5, 2],
-        [1, 2, 5], [1, 5, 3], [1, 3, 4], [1, 4, 2]
-      );
-      break;
-    }
-
-    case 'icosahedron': {
-      const t = PHI;
-      vertices.push(
-        new THREE.Vector3(-1, t, 0), new THREE.Vector3(1, t, 0),
-        new THREE.Vector3(-1, -t, 0), new THREE.Vector3(1, -t, 0),
-        new THREE.Vector3(0, -1, t), new THREE.Vector3(0, 1, t),
-        new THREE.Vector3(0, -1, -t), new THREE.Vector3(0, 1, -t),
-        new THREE.Vector3(t, 0, -1), new THREE.Vector3(t, 0, 1),
-        new THREE.Vector3(-t, 0, -1), new THREE.Vector3(-t, 0, 1)
-      );
-      edges.push(
-        [0, 11], [0, 5], [0, 1], [0, 7], [0, 10],
-        [1, 5], [1, 7], [1, 8], [1, 9],
-        [2, 11], [2, 4], [2, 3], [2, 6], [2, 10],
-        [3, 4], [3, 6], [3, 8], [3, 9],
-        [4, 5], [4, 9], [4, 11],
-        [5, 9], [5, 11],
-        [6, 7], [6, 8], [6, 10],
-        [7, 8], [7, 10],
-        [8, 9],
-        [10, 11]
-      );
-      break;
-    }
-
-    case 'dodecahedron': {
-      const t = PHI;
-      const r = 1 / t;
-      vertices.push(
-        new THREE.Vector3(1, 1, 1), new THREE.Vector3(1, 1, -1),
-        new THREE.Vector3(1, -1, 1), new THREE.Vector3(1, -1, -1),
-        new THREE.Vector3(-1, 1, 1), new THREE.Vector3(-1, 1, -1),
-        new THREE.Vector3(-1, -1, 1), new THREE.Vector3(-1, -1, -1),
-        new THREE.Vector3(0, r, t), new THREE.Vector3(0, r, -t),
-        new THREE.Vector3(0, -r, t), new THREE.Vector3(0, -r, -t),
-        new THREE.Vector3(r, t, 0), new THREE.Vector3(r, -t, 0),
-        new THREE.Vector3(-r, t, 0), new THREE.Vector3(-r, -t, 0),
-        new THREE.Vector3(t, 0, r), new THREE.Vector3(t, 0, -r),
-        new THREE.Vector3(-t, 0, r), new THREE.Vector3(-t, 0, -r)
-      );
-      edges.push(
-        [0, 8], [0, 12], [0, 16], [1, 9], [1, 12], [1, 17],
-        [2, 10], [2, 13], [2, 16], [3, 11], [3, 13], [3, 17],
-        [4, 8], [4, 14], [4, 18], [5, 9], [5, 14], [5, 19],
-        [6, 10], [6, 15], [6, 18], [7, 11], [7, 15], [7, 19],
-        [8, 10], [9, 11], [12, 14], [13, 15], [16, 17], [18, 19]
-      );
-      break;
-    }
-  }
-
-  return { vertices, edges, faces };
-}
-
-export function createTorus(majorRadius: number = 1, minorRadius: number = 0.3, segments: number = 32, tubeSegments: number = 16): GeometryPoints {
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
-
-  for (let i = 0; i <= segments; i++) {
-    const u = (i / segments) * TAU;
-
-    for (let j = 0; j <= tubeSegments; j++) {
-      const v = (j / tubeSegments) * TAU;
-
-      const x = (majorRadius + minorRadius * Math.cos(v)) * Math.cos(u);
-      const y = (majorRadius + minorRadius * Math.cos(v)) * Math.sin(u);
-      const z = minorRadius * Math.sin(v);
-
-      vertices.push(new THREE.Vector3(x, y, z));
-
-      if (i > 0) {
-        const current = i * (tubeSegments + 1) + j;
-        const prev = (i - 1) * (tubeSegments + 1) + j;
-        edges.push([prev, current]);
-      }
-
-      if (j > 0) {
-        const current = i * (tubeSegments + 1) + j;
-        const prev = i * (tubeSegments + 1) + (j - 1);
-        edges.push([prev, current]);
+      // Radial lines connecting rings
+      if (ring > 1) {
+        const prevR = ((ring - 1) / rings) * r
+        ctx.globalAlpha = 0.4
+        ctx.beginPath()
+        ctx.moveTo(Math.cos(a) * prevR, Math.sin(a) * prevR)
+        ctx.lineTo(x1, y1)
+        ctx.stroke()
+        ctx.globalAlpha = 1
       }
     }
   }
 
-  return { vertices, edges };
+  ctx.restore()
 }
 
-export function createMerkaba(): GeometryPoints {
-  const tetrahedron1 = createPlatonicSolid('tetrahedron');
-  const tetrahedron2 = createPlatonicSolid('tetrahedron');
+// ── Khatam (Persian six-fold repeat) ────────────────────────────────────────
 
-  const vertices: THREE.Vector3[] = [...tetrahedron1.vertices];
-  const edges: [number, number][] = [...tetrahedron1.edges];
+/**
+ * Khatam: the traditional Persian interlocked star tile.
+ * Creates interlocking triangles and hexagons.
+ */
+export function drawKhatam(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  time: number,
+  energy: number,
+  completion: number,
+  strokeColor: string,
+  strokeWidth: number,
+  glowRadius: number
+) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.strokeStyle = strokeColor
+  ctx.lineWidth = strokeWidth
+  setGlow(ctx, strokeColor, glowRadius)
 
-  const offset = tetrahedron1.vertices.length;
-  tetrahedron2.vertices.forEach(v => {
-    const rotated = v.clone();
-    rotated.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
-    vertices.push(rotated);
-  });
-
-  tetrahedron2.edges.forEach(([a, b]) => {
-    edges.push([a + offset, b + offset]);
-  });
-
-  return { vertices, edges };
-}
-
-export function createHexagram(): GeometryPoints {
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
-  const radius = 1.5;
-
+  // Outer hexagon
+  const hexPts: Array<[number, number]> = []
   for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * TAU;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    vertices.push(new THREE.Vector3(x, y, 0));
+    const a = (i / 6) * TAU + time * 0.05
+    hexPts.push([Math.cos(a) * r, Math.sin(a) * r])
   }
 
-  edges.push([0, 2], [2, 4], [4, 0]);
-  edges.push([1, 3], [3, 5], [5, 1]);
+  const hexSegments = Math.floor(6 * completion)
+  ctx.beginPath()
+  hexPts.slice(0, hexSegments + 1).forEach((pt, i) => {
+    if (i === 0) ctx.moveTo(pt[0], pt[1])
+    else ctx.lineTo(pt[0], pt[1])
+  })
+  if (completion >= 1) ctx.closePath()
+  ctx.stroke()
 
-  return { vertices, edges };
-}
-
-export function createPentagram(): GeometryPoints {
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
-  const radius = 1.5;
-
-  for (let i = 0; i < 5; i++) {
-    const angle = (i / 5) * TAU - Math.PI / 2;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    vertices.push(new THREE.Vector3(x, y, 0));
-  }
-
-  edges.push([0, 2], [2, 4], [4, 1], [1, 3], [3, 0]);
-
-  return { vertices, edges };
-}
-
-export function createEnneagram(): GeometryPoints {
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
-  const radius = 1.5;
-
-  for (let i = 0; i < 9; i++) {
-    const angle = (i / 9) * TAU - Math.PI / 2;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    vertices.push(new THREE.Vector3(x, y, 0));
-  }
-
-  for (let i = 0; i < 9; i++) {
-    edges.push([i, (i + 1) % 9]);
-  }
-
-  edges.push([0, 3], [3, 6], [6, 0]);
-  edges.push([1, 4], [4, 7], [7, 1]);
-  edges.push([2, 5], [5, 8], [8, 2]);
-
-  return { vertices, edges };
-}
-
-export function createCelticKnot(): GeometryPoints {
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
-  const radius = 1.2;
-  const innerRadius = 0.6;
-  const segments = 8;
-
-  for (let i = 0; i < segments; i++) {
-    const angle = (i / segments) * TAU;
-    const x1 = Math.cos(angle) * radius;
-    const y1 = Math.sin(angle) * radius;
-    const x2 = Math.cos(angle) * innerRadius;
-    const y2 = Math.sin(angle) * innerRadius;
-
-    vertices.push(new THREE.Vector3(x1, y1, 0));
-    vertices.push(new THREE.Vector3(x2, y2, 0));
-
-    const outerIdx = i * 2;
-    const innerIdx = i * 2 + 1;
-    const nextOuterIdx = ((i + 1) % segments) * 2;
-    const nextInnerIdx = ((i + 1) % segments) * 2 + 1;
-
-    edges.push([outerIdx, nextInnerIdx]);
-    edges.push([innerIdx, nextOuterIdx]);
-  }
-
-  return { vertices, edges };
-}
-
-export function createMandala(layers: number = 6): GeometryPoints {
-  const vertices: THREE.Vector3[] = [];
-  const edges: [number, number][] = [];
-  const petalCount = 8;
-
-  for (let layer = 1; layer <= layers; layer++) {
-    const layerRadius = (layer / layers) * 1.5;
-    const petalRadius = layerRadius * 0.3;
-
-    for (let i = 0; i < petalCount; i++) {
-      const angle = (i / petalCount) * TAU;
-      const centerX = Math.cos(angle) * layerRadius;
-      const centerY = Math.sin(angle) * layerRadius;
-
-      const petalSegments = 16;
-      const startIdx = vertices.length;
-
-      for (let j = 0; j <= petalSegments; j++) {
-        const petalAngle = (j / petalSegments) * TAU;
-        const x = centerX + Math.cos(petalAngle) * petalRadius;
-        const y = centerY + Math.sin(petalAngle) * petalRadius;
-        vertices.push(new THREE.Vector3(x, y, 0));
-
-        if (j > 0) {
-          edges.push([startIdx + j - 1, startIdx + j]);
-        }
+  // Star of David (two triangles)
+  if (completion > 0.4) {
+    const triCompletion = (completion - 0.4) / 0.6
+    for (let tri = 0; tri < 2; tri++) {
+      const offset = tri === 0 ? 0 : Math.PI / 3 + time * 0.03
+      const triPts: Array<[number, number]> = []
+      for (let i = 0; i < 3; i++) {
+        const a = offset + (i / 3) * TAU
+        triPts.push([Math.cos(a) * r * 0.8, Math.sin(a) * r * 0.8])
       }
-    }
-
-    const layerStart = vertices.length - petalCount * (petalSegments + 1);
-    for (let i = 0; i < petalCount; i++) {
-      const currentPetal = layerStart + i * (petalSegments + 1);
-      const nextPetal = layerStart + ((i + 1) % petalCount) * (petalSegments + 1);
-      edges.push([currentPetal, nextPetal]);
+      const segments = Math.floor(3 * triCompletion)
+      ctx.beginPath()
+      triPts.slice(0, segments + 1).forEach((pt, i) => {
+        if (i === 0) ctx.moveTo(pt[0], pt[1])
+        else ctx.lineTo(pt[0], pt[1])
+      })
+      if (triCompletion >= 1) ctx.closePath()
+      ctx.stroke()
     }
   }
 
-  return { vertices, edges };
+  // Inner hexagon
+  if (completion > 0.7) {
+    const innerCompletion = (completion - 0.7) / 0.3
+    const innerPts: Array<[number, number]> = []
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU + Math.PI / 6 - time * 0.04
+      innerPts.push([Math.cos(a) * r * 0.4, Math.sin(a) * r * 0.4])
+    }
+    const innerSegments = Math.floor(6 * innerCompletion)
+    ctx.beginPath()
+    innerPts.slice(0, innerSegments + 1).forEach((pt, i) => {
+      if (i === 0) ctx.moveTo(pt[0], pt[1])
+      else ctx.lineTo(pt[0], pt[1])
+    })
+    if (innerCompletion >= 1) ctx.closePath()
+    ctx.stroke()
+  }
+
+  ctx.restore()
+}
+
+// ── Rosette ──────────────────────────────────────────────────────────────────
+
+/**
+ * Multi-petal rosette from overlapping circles — the mathematical
+ * basis for many Islamic patterns.
+ */
+export function drawRosette(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  petals: number,
+  time: number,
+  energy: number,
+  completion: number,
+  strokeColor: string,
+  strokeWidth: number,
+  glowRadius: number
+) {
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.strokeStyle = strokeColor
+  ctx.lineWidth = strokeWidth
+  setGlow(ctx, strokeColor, glowRadius)
+
+  const drawnPetals = Math.floor(petals * completion)
+
+  for (let i = 0; i < drawnPetals; i++) {
+    const a = (i / petals) * TAU + time * 0.04
+    const pcx = Math.cos(a) * r * 0.5
+    const pcy = Math.sin(a) * r * 0.5
+
+    ctx.beginPath()
+    ctx.arc(pcx, pcy, r * 0.5, 0, TAU)
+    ctx.stroke()
+  }
+
+  // Center circle
+  if (completion > 0.5) {
+    ctx.globalAlpha = (completion - 0.5) / 0.5
+    ctx.beginPath()
+    ctx.arc(0, 0, r * 0.2 * (1 + energy * 0.3), 0, TAU)
+    ctx.stroke()
+    ctx.globalAlpha = 1
+  }
+
+  ctx.restore()
+}
+
+// ── Symmetry helper: draw with N-fold radial symmetry ───────────────────────
+
+/**
+ * Execute a drawing callback N times, each rotated by TAU/N.
+ * This is the core of all symmetrical Islamic pattern generation.
+ */
+export function withSymmetry(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  folds: number,
+  time: number,
+  globalRotation: number,
+  callback: (ctx: CanvasRenderingContext2D) => void
+) {
+  for (let i = 0; i < folds; i++) {
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.rotate(globalRotation + (i / folds) * TAU)
+    callback(ctx)
+    ctx.restore()
+  }
+}
+
+// ── Ring-based tile reveal ───────────────────────────────────────────────────
+
+/**
+ * Generate ring positions for the growth mechanic.
+ * Ring 0 = center, ring 1 = 6 surrounding tiles, etc.
+ */
+export function getRingPositions(
+  ring: number,
+  tileSpacing: number
+): Array<[number, number]> {
+  if (ring === 0) return [[0, 0]]
+  const positions: Array<[number, number]> = []
+  const count = ring * 6
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * TAU
+    const dist = tileSpacing * ring
+    positions.push([Math.cos(angle) * dist, Math.sin(angle) * dist])
+  }
+  return positions
 }
