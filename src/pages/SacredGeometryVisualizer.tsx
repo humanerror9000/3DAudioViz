@@ -1,13 +1,14 @@
+// src/pages/SacredGeometryVisualizer.tsx
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Upload } from 'lucide-react';
 import { AudioEngine } from '../audio/AudioEngine';
 import { AudioAnalyser } from '../audio/AudioAnalyser';
-import { RecordingManager, RecordingQuality, RecordingFormat } from '../recording/RecordingManager';
+import { RecordingManager } from '../recording/RecordingManager';
 import { SacredGeometryRenderer } from '../visuals/SacredGeometryRenderer';
 import { GeometryControls } from '../ui/GeometryControls';
 import { GeometrySettings, defaultGeometrySettings } from '../types/geometry';
 import { AudioSettings, AudioFeatures } from '../types/audio';
-import { MIDIController, applyMIDIValueToParameter } from '../midi/MIDIController';
+import { MIDIController } from '../midi/MIDIController';
 import { MIDIState } from '../types/midi';
 import { formatTime } from '../utils/formatTime';
 
@@ -87,9 +88,7 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
 
     const handleResize = () => {
       if (!canvas) return;
-      const width = canvas.clientWidth;
-      const height = canvas.clientHeight;
-      renderer.resize(width, height);
+      renderer.resize(canvas.clientWidth, canvas.clientHeight);
     };
 
     window.addEventListener('resize', handleResize);
@@ -130,27 +129,21 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
     };
   }, []);
 
+  // Keep settingsRef in sync — this is the key to responsive sliders
   useEffect(() => {
     settingsRef.current = settings;
-    if (geometryRendererRef.current) {
-      geometryRendererRef.current.updateSettings(settings);
-      geometryRendererRef.current.updateLayers(settings.layers);
-    }
   }, [settings]);
 
   const handleAudioFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !audioEngineRef.current) return;
-
     try {
       await audioEngineRef.current.loadAudioFile(file);
-
       const analyserNode = audioEngineRef.current.getAnalyserNode();
       const audioContext = audioEngineRef.current['audioContext'];
       if (analyserNode && audioContext) {
         audioAnalyserRef.current = new AudioAnalyser(analyserNode, audioContext.sampleRate);
       }
-
       setDuration(audioEngineRef.current.duration);
       await audioEngineRef.current.play();
       setIsPlaying(true);
@@ -161,7 +154,6 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
 
   const togglePlayPause = async () => {
     if (!audioEngineRef.current) return;
-
     if (isPlaying) {
       audioEngineRef.current.pause();
       setIsPlaying(false);
@@ -181,6 +173,7 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
     <div className="fixed inset-0 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
+      {/* Header */}
       <div className="absolute top-4 left-4 right-4 flex items-start justify-between pointer-events-none">
         <button
           onClick={onBack}
@@ -189,23 +182,22 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
           <ArrowLeft className="w-4 h-4" />
           Back
         </button>
-
         <div className="text-right">
           <h1 className="text-2xl font-bold text-white drop-shadow-lg">
-            Sacred Geometry Visualizer
+            Geometric Visualizer
           </h1>
           <p className="text-sm text-gray-300 mt-1">
-            Ancient patterns meet modern audio reactivity
+            Islamic pattern · Neon geometry · Audio reactive
           </p>
         </div>
       </div>
 
-      <div className="absolute top-20 left-4 w-80 max-h-[calc(100vh-120px)] overflow-y-auto pointer-events-none">
+      {/* Left panel */}
+      <div className="absolute top-20 left-4 w-72 max-h-[calc(100vh-120px)] overflow-y-auto pointer-events-none">
         <div className="space-y-4 pointer-events-auto">
+          {/* Audio controls */}
           <div className="bg-gray-900/80 backdrop-blur-sm rounded-lg p-4">
-            <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-              Audio Input
-            </h3>
+            <h3 className="text-sm font-medium mb-3">Audio Input</h3>
             <input
               ref={audioFileInputRef}
               type="file"
@@ -215,12 +207,11 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
             />
             <button
               onClick={() => audioFileInputRef.current?.click()}
-              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded flex items-center justify-center gap-2 text-sm"
             >
               <Upload className="w-4 h-4" />
               Load Audio File
             </button>
-
             {duration > 0 && (
               <div className="mt-4">
                 <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
@@ -228,17 +219,13 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
                   <span>{formatTime(duration)}</span>
                 </div>
                 <input
-                  type="range"
-                  min="0"
-                  max={duration}
-                  step="0.1"
-                  value={currentTime}
-                  onChange={(e) => handleSeek(parseFloat(e.target.value))}
+                  type="range" min="0" max={duration} step="0.1" value={currentTime}
+                  onChange={e => handleSeek(parseFloat(e.target.value))}
                   className="w-full"
                 />
                 <button
                   onClick={togglePlayPause}
-                  className="w-full mt-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
+                  className="w-full mt-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm"
                 >
                   {isPlaying ? 'Pause' : 'Play'}
                 </button>
@@ -246,6 +233,7 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
             )}
           </div>
 
+          {/* Geometry controls */}
           <div className="bg-gray-900/80 backdrop-blur-sm rounded-lg overflow-hidden">
             <GeometryControls
               settings={settings}
@@ -257,12 +245,16 @@ export function SacredGeometryVisualizer({ onBack }: SacredGeometryVisualizerPro
         </div>
       </div>
 
-      <div className="absolute bottom-4 left-4 right-4 flex items-center justify-center gap-8 text-xs text-gray-400 pointer-events-none">
+      {/* Audio analysis footer */}
+      <div className="absolute bottom-4 left-4 right-4 flex items-center justify-center gap-6 text-xs text-gray-400 pointer-events-none">
         <div className="bg-gray-900/60 backdrop-blur-sm px-3 py-2 rounded">
           Energy: {(audioFeatures.energy * 100).toFixed(0)}%
         </div>
         <div className="bg-gray-900/60 backdrop-blur-sm px-3 py-2 rounded">
           Bass: {(audioFeatures.bass * 100).toFixed(0)}%
+        </div>
+        <div className="bg-gray-900/60 backdrop-blur-sm px-3 py-2 rounded">
+          Mids: {(audioFeatures.mids * 100).toFixed(0)}%
         </div>
         <div className="bg-gray-900/60 backdrop-blur-sm px-3 py-2 rounded">
           Highs: {(audioFeatures.highs * 100).toFixed(0)}%
